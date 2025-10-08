@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scan prix → € (v8: pastille persistante + couleurs)</title>
+  <title>Scan prix → € (v9: résultat 5s sous la fenêtre)</title>
   <meta name="theme-color" content="#111827"/>
   <style>
     :root{ --veil: rgba(0,0,0,.22); --accent:#22d3ee; --bg:#fafafa; --ink:#111827 }
@@ -27,8 +27,8 @@
 /* Bouton scan flottant */
 #scanFloat{position:absolute;z-index:6;width:52px;height:52px;border-radius:9999px;border:none;background:#111827;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:22px;pointer-events:auto}
 
-/* Pastille de résultat sous la fenêtre (persistante) */
-#roiResult{position:absolute;z-index:6;pointer-events:none;color:#fff;padding:6px 10px;border-radius:9999px;font-weight:800;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.25);white-space:nowrap;opacity:0;transition:opacity .2s ease, background-color .2s ease}
+/* Pastille de résultat: s'aligne sur la largeur de la fenêtre et reste 5s */
+#roiResult{position:absolute;z-index:6;pointer-events:none;color:#fff;padding:6px 10px;border-radius:10px;font-weight:800;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:0;transition:opacity .18s ease, background-color .18s ease; text-align:center}
 #roiResult.show{opacity:1}
 
 #output{font-size:1.15rem}
@@ -120,50 +120,48 @@ const wrap = document.getElementById('wrap');
 const roiResult = document.getElementById('roiResult');
 
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-let zoom2x=false; let stream=null; let hasResult=false;
+let zoom2x=false; let stream=null; let hideTimer=null;
 let roi = { x:14, y:45, w:72, h:10 };
 
-function badgeColor(cur){
+function badgeCss(cur){
   switch(cur){
-    case 'CZK': return 'linear-gradient(90deg,#06b6d4,#0891b2)'; // cyan
-    case 'EUR': return 'linear-gradient(90deg,#16a34a,#15803d)'; // vert
-    case 'USD': return 'linear-gradient(90deg,#f59e0b,#d97706)'; // or/ambre
-    case 'GBP': return 'linear-gradient(90deg,#8b5cf6,#7c3aed)'; // violet
+    case 'CZK': return 'linear-gradient(90deg, rgba(6,182,212,.92), rgba(8,145,178,.92))';
+    case 'EUR': return 'linear-gradient(90deg, rgba(22,163,74,.92), rgba(21,128,61,.92))';
+    case 'USD': return 'linear-gradient(90deg, rgba(245,158,11,.92), rgba(217,119,6,.92))';
+    case 'GBP': return 'linear-gradient(90deg, rgba(139,92,246,.92), rgba(124,58,237,.92))';
     default:    return 'rgba(17,24,39,.88)';
   }
 }
 
-function positionRoiWidgets(){
+function positionWidgets(){
   const r = wrap.getBoundingClientRect();
+  // Position bouton scan à droite de la fenêtre
   const leftPx = r.width * (roi.x + roi.w + 1.5) / 100;
   const topPx  = r.height * (roi.y + roi.h/2) / 100;
   scanFloat.style.left = clamp(leftPx, 8, r.width - 60) + 'px';
   scanFloat.style.top  = clamp(topPx - 26, 8, r.height - 60) + 'px';
-  // ROI result: centré sous le trou (ou au-dessus si trop bas)
-  const rrLeft = r.width * (roi.x + roi.w/2) / 100;
-  let rrTop = r.height * (roi.y + roi.h + 2) / 100; // +2% sous la fenêtre
-  const rrWidth = (roiResult.getBoundingClientRect().width || 180);
-  if(rrTop + 36 > r.height) rrTop = r.height * (roi.y - 3) / 100; // remonte si dépasse
-  roiResult.style.left = clamp(rrLeft - rrWidth/2, 8, r.width - rrWidth - 8) + 'px';
-  roiResult.style.top  = clamp(rrTop, 8, r.height - 40) + 'px';
-  if(hasResult) roiResult.classList.add('show');
+  // Pastille: alignée sur la largeur de la fenêtre, collée juste SOUS le bord inférieur
+  const rrLeft = r.width * (roi.x) / 100;
+  let rrTop = r.height * (roi.y + roi.h + 1.5) / 100; // 1.5% sous le trou
+  const rrWidth = r.width * (roi.w) / 100;
+  // Si ça dépasse en bas, place DANS la fenêtre, 1.5% au-dessus du bord
+  if(rrTop + 36 > r.height) rrTop = r.height * (roi.y + roi.h - 1.5) / 100 - 30;
+  roiResult.style.left = Math.round(rrLeft) + 'px';
+  roiResult.style.top  = Math.round(rrTop) + 'px';
+  roiResult.style.width= Math.max(120, Math.round(rrWidth)) + 'px';
 }
 
 function applyRoi(){
   roi.w = clamp(roi.w, 10, 95); roi.h = clamp(roi.h, 4, 22);
   roi.x = clamp(roi.x, 0.5, 99.5 - roi.w); roi.y = clamp(roi.y, 0.5, 99.5 - roi.h);
   for(const el of [holeMask, holeStroke]){ el.setAttribute('x', roi.x); el.setAttribute('y', roi.y); el.setAttribute('width', roi.w); el.setAttribute('height', roi.h); }
-  positionRoiWidgets();
+  positionWidgets();
 }
 
-function updateFromInputs(){
-  roi.w = parseInt(roiW.value,10); roi.h = parseInt(roiH.value,10);
-  roi.x = (100 - roi.w)/2; roi.y = (100 - roi.h)/2; applyRoi();
-}
-
+function updateFromInputs(){ roi.w = parseInt(roiW.value,10); roi.h = parseInt(roiH.value,10); roi.x = (100 - roi.w)/2; roi.y = (100 - roi.h)/2; applyRoi(); }
 function syncInputs(){ roiW.value = roi.w; roiH.value = roi.h; }
 roiW.addEventListener('input', updateFromInputs); roiH.addEventListener('input', updateFromInputs);
-window.addEventListener('resize', positionRoiWidgets);
+window.addEventListener('resize', positionWidgets);
 
 presetFine.addEventListener('click', ()=>{ roi.w=80; roi.h=6; roi.x=(100-roi.w)/2; roi.y=(100-roi.h)/2; syncInputs(); applyRoi(); });
 
@@ -171,7 +169,7 @@ toggleZoom.addEventListener('click', ()=>{ zoom2x=!zoom2x; toggleZoom.textConten
 
 swapCur.addEventListener('click', ()=>{ const v=targetSel.value; targetSel.value = (v==='EUR') ? 'CZK' : (v==='CZK' ? 'EUR' : 'EUR'); });
 
-// Drag
+// Drag ROI
 let dragging=false, start={x:0,y:0}, roiStart={x:0,y:0};
 function pt(e){ const t=e.touches?e.touches[0]:e; const rect=wrap.getBoundingClientRect(); return {px:clamp((t.clientX-rect.left)/rect.width*100,0,100), py:clamp((t.clientY-rect.top)/rect.height*100,0,100)}; }
 function onDown(e){ const {px,py}=pt(e); if(px>=roi.x && px<=roi.x+roi.w && py>=roi.y && py<=roi.y+roi.h){ dragging=true; start={x:px,y:py}; roiStart={x:roi.x,y:roi.y}; e.preventDefault(); } }
@@ -186,6 +184,8 @@ async function getRate(src,tgt){ if(src===tgt) return 1; const url=`https://api.
 
 async function doScan(){
   details.textContent='Lecture…'; scanFloat.disabled=true; if(scanFloatFs) scanFloatFs.disabled=true;
+  if(hideTimer){ clearTimeout(hideTimer); hideTimer=null; }
+  roiResult.classList.remove('show');
   const vw=video.videoWidth, vh=video.videoHeight; if(!vw||!vh){ details.textContent='Caméra non prête'; scanFloat.disabled=false; if(scanFloatFs) scanFloatFs.disabled=false; return; }
   canvas.width=vw; canvas.height=vh; const ctx=canvas.getContext('2d'); ctx.drawImage(video,0,0,vw,vh);
   const rx=Math.round(vw*roi.x/100), ry=Math.round(vh*roi.y/100), rw=Math.round(vw*roi.w/100), rh=Math.round(vh*roi.h/100);
@@ -196,9 +196,13 @@ async function doScan(){
     const {data:{text}}=await Tesseract.recognize(crop,'eng+fra',{tessedit_pageseg_mode:7});
     const parsed=extractAmountAndCurrency(text); if(!parsed){ out.textContent='Rien d\'exploitable'; details.textContent=''; return; }
     const tgt=targetSel.value; const rate=await getRate(parsed.srcCur,tgt); const converted=parsed.amount*rate;
-    const line=`${parsed.amount.toFixed(2)} ${parsed.srcCur} ≈ ${converted.toFixed(2)} ${tgt}`;
-    roiResult.textContent=line; roiResult.style.background = badgeColor(parsed.srcCur);
-    hasResult=true; positionRoiWidgets(); roiResult.classList.add('show');
+    // Pastille 5s sous la fenêtre, alignée sur sa largeur
+    roiResult.textContent=`${parsed.amount.toFixed(2)} ${parsed.srcCur} ≈ ${converted.toFixed(2)} ${tgt}`;
+    roiResult.style.background = badgeCss(parsed.srcCur);
+    positionWidgets();
+    roiResult.classList.add('show');
+    hideTimer = setTimeout(()=>{ roiResult.classList.remove('show'); }, 5000);
+
     out.innerHTML=`🧮 <strong>${parsed.amount.toFixed(2)} ${parsed.srcCur}</strong> ≈ <strong>${converted.toFixed(2)} ${tgt}</strong>`;
     details.innerHTML=`Taux: 1 ${parsed.srcCur} = ${rate.toFixed(4)} ${tgt}<br><span class="muted">OCR: ${parsed.raw.substring(0,160).replace(/</g,'&lt;')}…</span>`;
   }catch(err){ out.textContent='Erreur: '+err.message; details.textContent=''; }
@@ -207,8 +211,9 @@ async function doScan(){
 
 startBtn.addEventListener('click', async ()=>{ try{ stream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } }); video.srcObject=stream; await video.play(); scanFloat.addEventListener('click', doScan); if(scanFloatFs) scanFloatFs.addEventListener('click', doScan); applyRoi(); }catch(e){ alert('Impossible d\'accéder à la caméra. Vérifie les permissions et HTTPS.'); } });
 
-async function enterFullscreen(){ document.body.classList.add('fullscreen'); if(document.documentElement.requestFullscreen){ try{ await document.documentElement.requestFullscreen(); }catch{} } positionRoiWidgets(); }
-async function exitFullscreen(){ document.body.classList.remove('fullscreen'); if(document.fullscreenElement){ try{ await document.exitFullscreen(); }catch{} } positionRoiWidgets(); }
+// Plein écran
+async function enterFullscreen(){ document.body.classList.add('fullscreen'); if(document.documentElement.requestFullscreen){ try{ await document.documentElement.requestFullscreen(); }catch{} } positionWidgets(); }
+async function exitFullscreen(){ document.body.classList.remove('fullscreen'); if(document.fullscreenElement){ try{ await document.exitFullscreen(); }catch{} } positionWidgets(); }
 if(toggleFS) toggleFS.addEventListener('click', enterFullscreen);
 if(exitFS) exitFS.addEventListener('click', exitFullscreen);
 
