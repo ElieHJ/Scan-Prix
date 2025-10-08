@@ -3,31 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scan prix → € (fenêtre ciblée)</title>
+  <title>Scan prix → € (fenêtre ciblée, masque SVG)</title>
   <meta name="theme-color" content="#111827"/>
   <style>
-    html,body{
-      margin:0;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;
-      background:#fafafa;
-      color:#111827;
-    }
-    header{padding:12px 16px;background:#111827;color:#fff;}
+    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:#fafafa;color:#111827}
+    header{padding:12px 16px;background:#111827;color:#fff}
     main{padding:16px;display:grid;gap:12px;max-width:920px;margin:auto}
     .card{border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.05);background:#fff}
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    button{
-      padding:12px 16px;border-radius:12px;border:1px solid #111827;
-      background:#111827;color:#fff;font-weight:600;cursor:pointer
-    }
+    button{padding:12px 16px;border-radius:12px;border:1px solid #111827;background:#111827;color:#fff;font-weight:600;cursor:pointer}
     button:disabled{opacity:.6}
     select,input{padding:10px 12px;border-radius:12px;border:1px solid #d1d5db}
-    #wrap{position:relative}
-    #preview{width:100%;aspect-ratio:3/4;background:#000;border-radius:12px}
-    #roi{position:absolute;inset:0;pointer-events:none}
-    .mask{fill:rgba(0,0,0,0.5);}
-    .hole{stroke:#22d3ee;stroke-width:2;fill:transparent;}
-    .label{fill:#fff;font-size:4px;text-anchor:middle}
+    #wrap{position:relative;}
+    #preview{width:100%;aspect-ratio:3/4;background:#000;border-radius:12px;display:block}
+    /* Overlay couvre TOUTE la vidéo */
+    #overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
     #output{font-size:1.2rem}
     .muted{color:#6b7280}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#f3f4f6;border:1px solid #e5e7eb}
@@ -36,7 +26,7 @@
 </head>
 <body>
   <header>
-    <strong>Scanner prix → conversion (€)</strong>
+    <strong>Scanner prix → conversion (€) — fenêtre précise</strong>
   </header>
   <main>
     <section class="card">
@@ -56,23 +46,32 @@
           <input type="range" id="roiW" min="30" max="90" value="60"/>
         </label>
         <label>Hauteur fenêtre
-          <input type="range" id="roiH" min="6" max="20" value="10"/>
+          <input type="range" id="roiH" min="6" max="16" value="10"/>
         </label>
-        <span class="pill">OCR ligne (PSM 7)</span>
+        <span class="pill">Masque SVG (trou transparent) + OCR ligne</span>
       </div>
 
       <div id="wrap">
         <video id="preview" playsinline></video>
         <canvas id="frame" hidden></canvas>
-        <svg id="roi" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <rect class="mask" width="100" height="100"/>
-          <rect id="hole" class="hole" x="20" y="45" width="60" height="10" rx="3" ry="3"/>
-          <text class="label" x="50" y="10">Cadre la ligne du prix</text>
+        <!-- Overlay SVG pleine taille avec masque "trou" -->
+        <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <mask id="cutout">
+              <rect x="0" y="0" width="100" height="100" fill="white"/>
+              <!-- Le trou (en noir) est transparent -->
+              <rect id="holeMask" x="20" y="45" width="60" height="10" fill="black" rx="2" ry="2"/>
+            </mask>
+          </defs>
+          <!-- voile sombre partout SAUF dans le trou -->
+          <rect x="0" y="0" width="100" height="100" fill="rgba(0,0,0,0.45)" mask="url(#cutout)"/>
+          <!-- fin contour fin bleu -->
+          <rect id="holeStroke" x="20" y="45" width="60" height="10" fill="none" stroke="#22d3ee" stroke-width="0.8" rx="2" ry="2"/>
+          <text x="50" y="8" fill="#ffffff" font-size="4" text-anchor="middle">Cadre la ligne du prix</text>
         </svg>
       </div>
       <p id="hint" class="muted">
-        Place uniquement le prix dans la <strong>bande bleue transparente</strong>.
-        Ajuste la largeur/hauteur si besoin.
+        Seule la <strong>bande centrale transparente</strong> est scannée. Ajuste largeur/hauteur pour viser ~10 caractères.
       </p>
     </section>
 
@@ -92,46 +91,53 @@ const scanBtn = document.getElementById('scanBtn');
 const targetSel = document.getElementById('target');
 const roiW = document.getElementById('roiW');
 const roiH = document.getElementById('roiH');
-const hole = document.getElementById('hole');
+const holeMask = document.getElementById('holeMask');
+const holeStroke = document.getElementById('holeStroke');
 
 function updateHole(){
   const w = parseInt(roiW.value,10);
   const h = parseInt(roiH.value,10);
   const x = (100 - w)/2;
   const y = (100 - h)/2;
-  hole.setAttribute('x', x);
-  hole.setAttribute('y', y);
-  hole.setAttribute('width', w);
-  hole.setAttribute('height', h);
+  for(const el of [holeMask, holeStroke]){
+    el.setAttribute('x', x);
+    el.setAttribute('y', y);
+    el.setAttribute('width', w);
+    el.setAttribute('height', h);
+  }
 }
 roiW.addEventListener('input', updateHole);
 roiH.addEventListener('input', updateHole);
 updateHole();
 
 const CURRENCY_HINTS = [
-  { code: 'EUR', match: /(€|eur|euro)/i },
-  { code: 'CZK', match: /(czk|kč|kc|koruna|couronne)/i },
-  { code: 'USD', match: /($|usd|us\\s*d)/i },
-  { code: 'GBP', match: /(£|gbp|pound|livre)/i },
+  { code: 'EUR', match: /(€|\beur\b|\beuro\b)/i },
+  { code: 'CZK', match: /(\bczk\b|kč|\bkc\b|koruna|couronne)/i },
+  { code: 'USD', match: /(\$|\busd\b|\bus\s*d\b)/i },
+  { code: 'GBP', match: /(£|\bgbp\b|pound|livre)/i },
 ];
 
 function extractAmountAndCurrency(text){
-  const numberRegex = /([0-9]{1,3}(?:[\\s.,][0-9]{3})*|[0-9]+)(?:[\\s.,][0-9]{1,2})?/g;
+  const line = text.replace(/\n+/g,' ').trim();
+  const numberRegex = /([0-9]{1,3}(?:[\s.,][0-9]{3})*|[0-9]+)(?:[\s.,][0-9]{1,2})?/g;
   const candidates = [];
-  let m;
-  while ((m = numberRegex.exec(text)) !== null) candidates.push({raw:m[0]});
+  let m; while ((m = numberRegex.exec(line)) !== null) candidates.push({raw:m[0], idx:m.index});
+  if(!candidates.length) return null;
   let cur = 'CZK';
-  for (const hint of CURRENCY_HINTS){ if (hint.match.test(text)) { cur = hint.code; break; } }
-  const pick = candidates.at(-1);
-  if(!pick) return null;
-  const amount = parseFloat(pick.raw.replace(/\\s/g,'').replace(',', '.'));
+  for (const hint of CURRENCY_HINTS){ if (hint.match.test(line)) { cur = hint.code; break; } }
+  candidates.sort((a,b)=>b.raw.length-a.raw.length);
+  const pick = candidates[0];
+  const normalized = pick.raw.replace(/\s/g,'').replace(',', '.');
+  const amount = parseFloat(normalized);
   if (isNaN(amount)) return null;
-  return { amount, srcCur: cur };
+  return { amount, srcCur: cur, raw: line };
 }
 
 async function getRate(src, tgt){
   if(src===tgt) return 1;
-  const res = await fetch(`https://api.frankfurter.app/latest?amount=1&from=${src}&to=${tgt}`);
+  const url = `https://api.frankfurter.app/latest?amount=1&from=${encodeURIComponent(src)}&to=${encodeURIComponent(tgt)}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('Taux introuvable');
   const data = await res.json();
   return data.rates[tgt];
 }
@@ -141,14 +147,15 @@ async function doScan(){
   scanBtn.disabled = true;
 
   const vw = video.videoWidth, vh = video.videoHeight;
+  if(!vw || !vh){ details.textContent='Caméra non prête'; scanBtn.disabled=false; return; }
   canvas.width = vw; canvas.height = vh;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, vw, vh);
 
-  const wPct = parseFloat(hole.getAttribute('width'));
-  const hPct = parseFloat(hole.getAttribute('height'));
-  const xPct = parseFloat(hole.getAttribute('x'));
-  const yPct = parseFloat(hole.getAttribute('y'));
+  const wPct = parseFloat(holeMask.getAttribute('width'));
+  const hPct = parseFloat(holeMask.getAttribute('height'));
+  const xPct = parseFloat(holeMask.getAttribute('x'));
+  const yPct = parseFloat(holeMask.getAttribute('y'));
   const rx = Math.round(vw * xPct / 100);
   const ry = Math.round(vh * yPct / 100);
   const rw = Math.round(vw * wPct / 100);
@@ -159,17 +166,20 @@ async function doScan(){
   crop.getContext('2d').drawImage(canvas, rx, ry, rw, rh, 0, 0, rw, rh);
 
   try{
-    const { data: { text } } = await Tesseract.recognize(crop, 'eng+fra', {
-      tessedit_pageseg_mode: 7
-    });
+    const { data: { text } } = await Tesseract.recognize(crop, 'eng+fra', { tessedit_pageseg_mode: 7 });
     const parsed = extractAmountAndCurrency(text);
-    if(!parsed){ out.textContent='Rien d’exploitable'; details.textContent=''; return; }
-    const rate = await getRate(parsed.srcCur, targetSel.value);
+    if(!parsed){ out.textContent='Rien d\'exploitable'; details.textContent=''; return; }
+    const tgt = targetSel.value;
+    const rate = await getRate(parsed.srcCur, tgt);
     const converted = parsed.amount * rate;
-    out.innerHTML = `🧮 <strong>${parsed.amount.toFixed(2)} ${parsed.srcCur}</strong> ≈ <strong>${converted.toFixed(2)} ${targetSel.value}</strong>`;
-    details.textContent = `Taux : 1 ${parsed.srcCur} = ${rate.toFixed(4)} ${targetSel.value}`;
-  }catch(err){ out.textContent = 'Erreur: '+err.message; }
-  finally{ scanBtn.disabled = false; }
+    out.innerHTML = `🧮 <strong>${parsed.amount.toFixed(2)} ${parsed.srcCur}</strong> ≈ <strong>${converted.toFixed(2)} ${tgt}</strong>`;
+    details.innerHTML = `Taux: 1 ${parsed.srcCur} = ${rate.toFixed(4)} ${tgt}<br><span class="muted">OCR: ${parsed.raw.substring(0,160).replace(/</g,'&lt;')}…</span>`;
+  }catch(err){
+    out.textContent = 'Erreur: ' + err.message;
+    details.textContent = '';
+  }finally{
+    scanBtn.disabled = false;
+  }
 }
 
 startBtn.addEventListener('click', async ()=>{
@@ -177,7 +187,9 @@ startBtn.addEventListener('click', async ()=>{
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     video.srcObject = stream; await video.play();
     scanBtn.disabled = false; startBtn.disabled = true;
-  }catch(e){ alert('Impossible d’accéder à la caméra'); }
+  }catch(e){
+    alert('Impossible d\'accéder à la caméra. Vérifie les permissions et HTTPS.');
+  }
 });
 
 scanBtn.addEventListener('click', doScan);
