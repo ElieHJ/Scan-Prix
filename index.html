@@ -3,32 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scan prix → € (PWA) — ROI</title>
+  <title>Scan prix → € (PWA)</title>
   <meta name="theme-color" content="#111827"/>
   <style>
-    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:#fafafa;color:#111827}
-    header{padding:12px 16px;background:#111827;color:#fff}
+    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;}
+    header{padding:12px 16px;background:#111827;color:#fff;}
     main{padding:16px;display:grid;gap:12px;max-width:920px;margin:auto}
-    .card{border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.05);background:#fff}
+    .card{border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.05)}
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    button{padding:12px 16px;border-radius:12px;border:1px solid #111827;background:#111827;color:#fff;font-weight:600;cursor:pointer}
+    button{padding:12px 16px;border-radius:12px;border:1px solid #111827;background:#111827;color:#fff;font-weight:600}
     button:disabled{opacity:.6}
     select,input{padding:10px 12px;border-radius:12px;border:1px solid #d1d5db}
-    #wrap{position:relative}
     #preview{width:100%;aspect-ratio:3/4;background:#000;border-radius:12px}
-    #roi{position:absolute;inset:0;pointer-events:none}
-    .mask{position:absolute;inset:0;background:rgba(0,0,0,.35);border-radius:12px}
-    .hole{position:absolute;border:2px dashed #22d3ee;box-shadow:0 0 0 9999px rgba(0,0,0,.35);border-radius:10px}
-    .label{position:absolute;left:50%;transform:translateX(-50%);top:8px;background:#111827;color:#fff;font-size:.8rem;padding:2px 8px;border-radius:999px}
     #output{font-size:1.2rem}
     .muted{color:#6b7280}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#f3f4f6;border:1px solid #e5e7eb}
+    .ok{color:#065f46}
+    .warn{color:#92400e}
+    footer{padding:24px;text-align:center;color:#6b7280}
+    code{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:2px 6px}
   </style>
+  <!-- Tesseract.js OCR -->
   <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 </head>
 <body>
   <header>
-    <strong>Scanner prix → conversion (€) — fenêtre de scan ciblée</strong>
+    <strong>Scanner prix → conversion (€)</strong>
   </header>
   <main>
     <section class="card">
@@ -44,27 +44,11 @@
             <option value="CZK">CZK (Kč)</option>
           </select>
         </label>
-        <label>
-          Largeur fenêtre
-          <input type="range" id="roiW" min="30" max="90" value="60"/>
-        </label>
-        <label>
-          Hauteur fenêtre
-          <input type="range" id="roiH" min="6" max="20" value="10"/>
-        </label>
-        <span class="pill">OCR ligne (PSM 7) + taux en direct</span>
+        <span class="pill">Reconnaissance OCR + taux en direct</span>
       </div>
-
-      <div id="wrap">
-        <video id="preview" playsinline></video>
-        <canvas id="frame" hidden></canvas>
-        <svg id="roi" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <rect class="mask" x="0" y="0" width="100" height="100" fill="none" />
-          <rect id="hole" class="hole" x="20" y="45" width="60" height="10" rx="3" ry="3" />
-          <text class="label" x="50" y="8">Cadre la ligne du prix</text>
-        </svg>
-      </div>
-      <p id="hint" class="muted">La zone active est la <strong>fenêtre bleue</strong> (≈ une ligne ~10 caractères). Ajuste sa taille avec les curseurs si besoin.</p>
+      <video id="preview" playsinline></video>
+      <canvas id="frame" hidden></canvas>
+      <p id="hint" class="muted">Cadre une étiquette, un menu, un ticket… puis appuie sur <em>Scanner</em>.</p>
     </section>
 
     <section class="card">
@@ -75,12 +59,13 @@
     <section class="card">
       <h3>Conseils</h3>
       <ul>
-        <li>Place uniquement le <strong>prix</strong> dans la fenêtre bleue (évite les autres lignes).</li>
-        <li>Évite les reflets ; bouge légèrement pour l’autofocus.</li>
-        <li>Devise auto (Kč/CZK/€/$/£). Par défaut: CZK si non détectée.</li>
+        <li>Laisse la caméra faire la mise au point. Évite les reflets.</li>
+        <li>L’app détecte automatiquement CZK/Kč/€/$/£. Si la devise n’est pas trouvée, elle suppose CZK (configurable).</li>
+        <li>Fonctionne en HTTPS (exigence navigateur pour la caméra). En local, <code>localhost</code> suffit.</li>
       </ul>
     </section>
   </main>
+  <footer>© Toi. Installe sur l’écran d’accueil : menu navigateur → « Ajouter à l’écran d’accueil ».</footer>
 
 <script>
 const video = document.getElementById('preview');
@@ -90,51 +75,37 @@ const details = document.getElementById('details');
 const startBtn = document.getElementById('startBtn');
 const scanBtn = document.getElementById('scanBtn');
 const targetSel = document.getElementById('target');
-const roiW = document.getElementById('roiW');
-const roiH = document.getElementById('roiH');
-const hole = document.getElementById('hole');
 
 let stream;
 
-function updateHole(){
-  const w = parseInt(roiW.value,10); // pourcentage
-  const h = parseInt(roiH.value,10);
-  const x = (100 - w)/2;
-  const y = (100 - h)/2;
-  hole.setAttribute('x', String(x));
-  hole.setAttribute('y', String(y));
-  hole.setAttribute('width', String(w));
-  hole.setAttribute('height', String(h));
-}
-roiW.addEventListener('input', updateHole);
-roiH.addEventListener('input', updateHole);
-updateHole();
-
 const CURRENCY_HINTS = [
-  { code: 'EUR', match: /(€|\beur\b|\beuro\b)/i },
-  { code: 'CZK', match: /(\bczk\b|kč|\bkc\b|koruna|couronne)/i },
-  { code: 'USD', match: /(\$|\busd\b|\bus\s*d\b)/i },
-  { code: 'GBP', match: /(£|\bgbp\b|pound|livre)/i },
+  { code: 'EUR', match: /(€|eur|euro)/i },
+  { code: 'CZK', match: /(czk|kč|kc|koruna|couronne)/i },
+  { code: 'USD', match: /($|usd|us\s*d)/i },
+  { code: 'GBP', match: /(£|gbp|pound|livre)/i },
 ];
 
 function extractAmountAndCurrency(text){
-  const line = text.replace(/\n+/g,' ').trim();
+  // 1) Trouver un nombre (avec , ou . et espaces) le plus « crédible »
   const numberRegex = /([0-9]{1,3}(?:[\s.,][0-9]{3})*|[0-9]+)(?:[\s.,][0-9]{1,2})?/g;
   const candidates = [];
-  let m; while ((m = numberRegex.exec(line)) !== null) candidates.push({raw:m[0], idx:m.index});
-  if(candidates.length===0) return null;
-  let cur = 'CZK';
-  for (const hint of CURRENCY_HINTS){ if (hint.match.test(line)) { cur = hint.code; break; } }
-  candidates.sort((a,b)=>b.raw.length-a.raw.length);
-  const pick = candidates[0];
+  let m;
+  while ((m = numberRegex.exec(text)) !== null) candidates.push({raw:m[0], idx:m.index});
+  // Heuristique : prendre le plus proche d’un symbole monnaie
+  let cur = 'CZK'; // défaut: couronne tchèque (modifiable)
+  for (const hint of CURRENCY_HINTS){ if (hint.match.test(text)) { cur = hint.code; break; } }
+  // Choisir dernier nombre trouvé (souvent le prix final)
+  const pick = candidates.at(-1);
+  if(!pick) return null;
   const normalized = pick.raw.replace(/\s/g,'').replace(',', '.');
   const amount = parseFloat(normalized);
   if (isNaN(amount)) return null;
-  return { amount, srcCur: cur, raw: line };
+  return { amount, srcCur: cur };
 }
 
 async function getRate(src, tgt){
   if(src===tgt) return 1;
+  // Frankfurter (Banque centrale européenne). Exemple d’API publique.
   const url = `https://api.frankfurter.app/latest?amount=1&from=${encodeURIComponent(src)}&to=${encodeURIComponent(tgt)}`;
   const res = await fetch(url);
   if(!res.ok) throw new Error('Taux introuvable');
@@ -145,34 +116,17 @@ async function getRate(src, tgt){
 async function doScan(){
   details.textContent = 'Lecture…';
   scanBtn.disabled = true;
-
-  const vw = video.videoWidth, vh = video.videoHeight;
-  canvas.width = vw; canvas.height = vh;
+  // Capture un frame
+  const w = video.videoWidth, h = video.videoHeight;
+  canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, vw, vh);
-
-  const wPct = parseFloat(hole.getAttribute('width'));
-  const hPct = parseFloat(hole.getAttribute('height'));
-  const xPct = parseFloat(hole.getAttribute('x'));
-  const yPct = parseFloat(hole.getAttribute('y'));
-  const rx = Math.round(vw * xPct / 100);
-  const ry = Math.round(vh * yPct / 100);
-  const rw = Math.round(vw * wPct / 100);
-  const rh = Math.round(vh * hPct / 100);
-
-  const crop = document.createElement('canvas');
-  crop.width = rw; crop.height = rh;
-  const cctx = crop.getContext('2d');
-  cctx.drawImage(canvas, rx, ry, rw, rh, 0, 0, rw, rh);
+  ctx.drawImage(video, 0, 0, w, h);
 
   try{
-    const { data: { text } } = await Tesseract.recognize(crop, 'eng+fra', {
-      logger: ()=>{},
-      tessedit_pageseg_mode: 7,
-    });
+    const { data: { text } } = await Tesseract.recognize(canvas, 'eng+fra', { logger: ()=>{} });
     const parsed = extractAmountAndCurrency(text);
     if(!parsed){
-      out.innerHTML = '😕 Rien d’exploitable. Ajuste la fenêtre sur la ligne exacte du prix.';
+      out.innerHTML = '😕 Rien d’exploitable. Re-essaie en cadrant mieux.';
       details.textContent = '';
       return;
     }
@@ -180,7 +134,7 @@ async function doScan(){
     const rate = await getRate(parsed.srcCur, tgt);
     const converted = parsed.amount * rate;
     out.innerHTML = `🧮 <strong>${parsed.amount.toFixed(2)} ${parsed.srcCur}</strong> ≈ <strong>${converted.toFixed(2)} ${tgt}</strong>`;
-    details.innerHTML = `Taux: 1 ${parsed.srcCur} = ${rate.toFixed(4)} ${tgt}<br><span class="muted">OCR: ${parsed.raw.substring(0,180).replace(/</g,'&lt;')}…</span>`;
+    details.innerHTML = `Taux: 1 ${parsed.srcCur} = ${rate.toFixed(4)} ${tgt}<br><span class="muted">Texte OCR détecté : ${text.substring(0,180).replace(/</g,'&lt;')}…</span>`;
   }catch(err){
     out.textContent = 'Erreur: ' + err.message;
     details.textContent = '';
@@ -191,8 +145,8 @@ async function doScan(){
 
 startBtn.addEventListener('click', async ()=>{
   try{
-    const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    stream = media; video.srcObject = stream; await video.play();
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream; await video.play();
     scanBtn.disabled = false; startBtn.disabled = true;
   }catch(e){
     alert('Impossible d’accéder à la caméra. Vérifie les permissions et HTTPS.');
@@ -202,6 +156,7 @@ startBtn.addEventListener('click', async ()=>{
 scanBtn.addEventListener('click', doScan);
 </script>
 
+<!-- Manifeste PWA minimal (facultatif) -->
 <link rel="manifest" href="data:application/manifest+json,{\"name\":\"Scan prix → €\",\"short_name\":\"ScanPrix\",\"start_url\":\".\",\"display\":\"standalone\",\"background_color\":\"#111827\",\"theme_color\":\"#111827\"}">
 </body>
 </html>
