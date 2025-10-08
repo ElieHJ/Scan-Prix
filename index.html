@@ -3,22 +3,31 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scan prix → € (fenêtre ciblée, masque SVG)</title>
+  <title>Scan prix → € (fenêtre ciblée, v3)</title>
   <meta name="theme-color" content="#111827"/>
   <style>
     html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:#fafafa;color:#111827}
     header{padding:12px 16px;background:#111827;color:#fff}
-    main{padding:16px;display:grid;gap:12px;max-width:920px;margin:auto}
-    .card{border:1px solid #e5e7eb;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.05);background:#fff}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    button{padding:12px 16px;border-radius:12px;border:1px solid #111827;background:#111827;color:#fff;font-weight:600;cursor:pointer}
+    main{padding:12px;display:grid;gap:12px;max-width:920px;margin:auto}
+    .card{border:1px solid #e5e7eb;border-radius:14px;padding:12px;box-shadow:0 4px 14px rgba(0,0,0,.05);background:#fff}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    button{padding:10px 14px;border-radius:12px;border:1px solid #111827;background:#111827;color:#fff;font-weight:600;cursor:pointer}
     button:disabled{opacity:.6}
-    select,input{padding:10px 12px;border-radius:12px;border:1px solid #d1d5db}
-    #wrap{position:relative;}
-    #preview{width:100%;aspect-ratio:3/4;background:#000;border-radius:12px;display:block}
-    /* Overlay couvre TOUTE la vidéo */
+    select,input{padding:8px 10px;border-radius:12px;border:1px solid #d1d5db}
+
+    /* Zone caméra compacte */
+    #wrap{position:relative;max-height:64vh}
+    #preview{width:100%;aspect-ratio:16/10;background:#000;border-radius:12px;display:block}
     #overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
-    #output{font-size:1.2rem}
+
+    /* Masque: voile léger + cadre fin */
+    .veil{fill:rgba(0,0,0,0.25)} /* moins sombre pour voir autour */
+    .hole-stroke{fill:none;stroke:#22d3ee;stroke-width:0.6}
+
+    /* Bouton scan flottant, ancré près de la fenêtre */
+    #scanFloat{position:absolute;z-index:10;width:52px;height:52px;border-radius:9999px;border:none;background:#111827;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:22px;pointer-events:auto}
+
+    #output{font-size:1.15rem}
     .muted{color:#6b7280}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#f3f4f6;border:1px solid #e5e7eb}
   </style>
@@ -26,15 +35,13 @@
 </head>
 <body>
   <header>
-    <strong>Scanner prix → conversion (€) — fenêtre précise</strong>
+    <strong>Scanner prix → conversion (€)</strong>
   </header>
   <main>
     <section class="card">
       <div class="row">
         <button id="startBtn">Activer la caméra</button>
-        <button id="scanBtn" disabled>Scanner</button>
-        <label>
-          Devise cible
+        <label>Devise cible
           <select id="target">
             <option value="EUR" selected>EUR (€)</option>
             <option value="USD">USD ($)</option>
@@ -42,37 +49,34 @@
             <option value="CZK">CZK (Kč)</option>
           </select>
         </label>
-        <label>Largeur fenêtre
+        <label>Largeur
           <input type="range" id="roiW" min="30" max="90" value="60"/>
         </label>
-        <label>Hauteur fenêtre
-          <input type="range" id="roiH" min="6" max="16" value="10"/>
+        <label>Hauteur
+          <input type="range" id="roiH" min="6" max="14" value="10"/>
         </label>
-        <span class="pill">Masque SVG (trou transparent) + OCR ligne</span>
+        <span class="pill">Fenêtre ciblée + OCR ligne</span>
       </div>
 
       <div id="wrap">
         <video id="preview" playsinline></video>
         <canvas id="frame" hidden></canvas>
+
+        <!-- Bouton scan flottant (à côté de la fenêtre bleue) -->
+        <button id="scanFloat" title="Scanner" aria-label="Scanner">🔍</button>
+
         <!-- Overlay SVG pleine taille avec masque "trou" -->
         <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
           <defs>
             <mask id="cutout">
               <rect x="0" y="0" width="100" height="100" fill="white"/>
-              <!-- Le trou (en noir) est transparent -->
               <rect id="holeMask" x="20" y="45" width="60" height="10" fill="black" rx="2" ry="2"/>
             </mask>
           </defs>
-          <!-- voile sombre partout SAUF dans le trou -->
-          <rect x="0" y="0" width="100" height="100" fill="rgba(0,0,0,0.45)" mask="url(#cutout)"/>
-          <!-- fin contour fin bleu -->
-          <rect id="holeStroke" x="20" y="45" width="60" height="10" fill="none" stroke="#22d3ee" stroke-width="0.8" rx="2" ry="2"/>
-          <text x="50" y="8" fill="#ffffff" font-size="4" text-anchor="middle">Cadre la ligne du prix</text>
+          <rect x="0" y="0" width="100" height="100" class="veil" mask="url(#cutout)"/>
+          <rect id="holeStroke" x="20" y="45" width="60" height="10" class="hole-stroke" rx="2" ry="2"/>
         </svg>
       </div>
-      <p id="hint" class="muted">
-        Seule la <strong>bande centrale transparente</strong> est scannée. Ajuste largeur/hauteur pour viser ~10 caractères.
-      </p>
     </section>
 
     <section class="card">
@@ -87,7 +91,7 @@ const canvas = document.getElementById('frame');
 const out = document.getElementById('output');
 const details = document.getElementById('details');
 const startBtn = document.getElementById('startBtn');
-const scanBtn = document.getElementById('scanBtn');
+const scanFloat = document.getElementById('scanFloat');
 const targetSel = document.getElementById('target');
 const roiW = document.getElementById('roiW');
 const roiH = document.getElementById('roiH');
@@ -105,9 +109,17 @@ function updateHole(){
     el.setAttribute('width', w);
     el.setAttribute('height', h);
   }
+  // Positionner le bouton de scan près du bord droit de la fenêtre
+  // Convertit les % en px en se basant sur la taille réelle de la vidéo
+  const wrapRect = document.getElementById('wrap').getBoundingClientRect();
+  const leftPx = wrapRect.width * (x + w + 2) / 100; // 2% à droite du trou
+  const topPx  = wrapRect.height * (y + h/2) / 100;  // centré verticalement sur le trou
+  scanFloat.style.left = Math.min(leftPx, wrapRect.width - 60) + 'px';
+  scanFloat.style.top  = Math.max(8, Math.min(topPx - 26, wrapRect.height - 60)) + 'px';
 }
 roiW.addEventListener('input', updateHole);
 roiH.addEventListener('input', updateHole);
+window.addEventListener('resize', updateHole);
 updateHole();
 
 const CURRENCY_HINTS = [
@@ -121,14 +133,13 @@ function extractAmountAndCurrency(text){
   const line = text.replace(/\n+/g,' ').trim();
   const numberRegex = /([0-9]{1,3}(?:[\s.,][0-9]{3})*|[0-9]+)(?:[\s.,][0-9]{1,2})?/g;
   const candidates = [];
-  let m; while ((m = numberRegex.exec(line)) !== null) candidates.push({raw:m[0], idx:m.index});
+  let m; while ((m = numberRegex.exec(line)) !== null) candidates.push({raw:m[0]});
   if(!candidates.length) return null;
   let cur = 'CZK';
   for (const hint of CURRENCY_HINTS){ if (hint.match.test(line)) { cur = hint.code; break; } }
   candidates.sort((a,b)=>b.raw.length-a.raw.length);
   const pick = candidates[0];
-  const normalized = pick.raw.replace(/\s/g,'').replace(',', '.');
-  const amount = parseFloat(normalized);
+  const amount = parseFloat(pick.raw.replace(/\s/g,'').replace(',', '.'));
   if (isNaN(amount)) return null;
   return { amount, srcCur: cur, raw: line };
 }
@@ -144,10 +155,10 @@ async function getRate(src, tgt){
 
 async function doScan(){
   details.textContent = 'Lecture…';
-  scanBtn.disabled = true;
+  scanFloat.disabled = true;
 
   const vw = video.videoWidth, vh = video.videoHeight;
-  if(!vw || !vh){ details.textContent='Caméra non prête'; scanBtn.disabled=false; return; }
+  if(!vw || !vh){ details.textContent='Caméra non prête'; scanFloat.disabled=false; return; }
   canvas.width = vw; canvas.height = vh;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, vw, vh);
@@ -178,7 +189,7 @@ async function doScan(){
     out.textContent = 'Erreur: ' + err.message;
     details.textContent = '';
   }finally{
-    scanBtn.disabled = false;
+    scanFloat.disabled = false;
   }
 }
 
@@ -186,13 +197,12 @@ startBtn.addEventListener('click', async ()=>{
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     video.srcObject = stream; await video.play();
-    scanBtn.disabled = false; startBtn.disabled = true;
+    scanFloat.addEventListener('click', doScan);
+    updateHole();
   }catch(e){
     alert('Impossible d\'accéder à la caméra. Vérifie les permissions et HTTPS.');
   }
 });
-
-scanBtn.addEventListener('click', doScan);
 </script>
 </body>
 </html>
