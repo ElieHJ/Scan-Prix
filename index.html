@@ -3,52 +3,53 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scan prix → € (v11: fix clics + zoom par défaut + icônes)</title>
-  <meta name="theme-color" content="#111827"/>
+  <title>Scan prix → € (v12: ILS + barre fixe + rendu)</title>
+  <meta name="theme-color" content="#0b1220"/>
   <style>
-    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:#fafafa;color:#111827}
-    /* Barre haute – bouton caméra centré */
-    header{position:sticky;top:0;z-index:1000;padding:10px;background:#111827;color:#fff;display:flex;justify-content:center}
-    #startBtn{padding:10px 16px;border-radius:9999px;border:1px solid #374151;background:#111827;color:#fff;font-weight:700}
+    :root{
+      --ink:#0b1220; --bg:#f6f7fb; --card:#ffffff;
+      --veil: rgba(0,0,0,.28); --accent:#22d3ee;
+      --btn:#0b1220; --btn-ink:#fff; --muted:#6b7280;
+    }
+    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:var(--bg);color:var(--ink)}
+    /* Barre top, caméra */
+    header{position:sticky;top:0;z-index:1000;padding:10px;background:var(--ink);color:#fff;display:flex;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.16)}
+    #startBtn{padding:10px 16px;border-radius:9999px;border:1px solid #243041;background:transparent;color:#fff;font-weight:700;backdrop-filter: blur(6px)}
 
-    main{padding:10px;display:grid;gap:12px;max-width:920px;margin:auto}
-    .card{border:1px solid #e5e7eb;border-radius:14px;padding:10px;box-shadow:0 4px 14px rgba(0,0,0,.05);background:#fff}
+    main{padding:12px;display:grid;gap:12px;max-width:980px;margin:auto}
+    .card{border:1px solid #e5e7eb;border-radius:18px;padding:12px;box-shadow:0 8px 28px rgba(10,23,40,.08);background:var(--card)}
 
-    /* Zone vidéo large */
-    #wrap{position:relative;height:74vh;max-height:84vh;border-radius:12px;overflow:hidden;background:#000}
+    /* Caméra */
+    #wrap{position:relative;height:74vh;max-height:84vh;border-radius:18px;overflow:hidden;background:#000}
     #preview{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
-    /* L’overlay ne bloque jamais les clics */
-    #overlay{position:absolute;inset:0;pointer-events:none;z-index:10}
+    #overlay{position:absolute;inset:0;pointer-events:none;z-index:5}
 
-    .veil{fill:rgba(0,0,0,.22)}
-    .hole-stroke{fill:none;stroke:#22d3ee;stroke-width:0.9}
+    .veil{fill:var(--veil)}
+    .hole-stroke{fill:none;stroke:var(--accent);stroke-width:0.9}
 
-    /* Bouton scan flottant (cliquable au-dessus de tout) */
-    .fab{position:absolute;z-index:1100;width:52px;height:52px;border-radius:9999px;border:none;background:#111827;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer}
-    #scanFloat{right:10px;bottom:10px}
+    /* Bouton scan */
+    .fab{position:absolute;z-index:20;width:56px;height:56px;border-radius:9999px;border:none;background:var(--btn);color:var(--btn-ink);box-shadow:0 10px 26px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer}
+    #scanFloat{right:12px;bottom:12px}
 
     /* Pastille sous la fenêtre (5s) */
-    #roiResult{position:absolute;z-index:1100;color:#fff;padding:6px 10px;border-radius:10px;font-weight:800;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:0;transition:opacity .18s ease, background-color .18s ease; text-align:center; pointer-events:none}
+    #roiResult{position:absolute;z-index:15;color:#fff;padding:8px 12px;border-radius:12px;font-weight:800;font-size:15px;box-shadow:0 10px 26px rgba(0,0,0,.35);opacity:0;transition:opacity .18s ease, background-color .18s ease; text-align:center; pointer-events:none}
     #roiResult.show{opacity:1}
 
-    /* Barre d’icônes au-dessus du ROI – toujours cliquable */
-    .roiToolbar{position:absolute;z-index:1200;display:flex;gap:8px;align-items:center;transform:translate(-50%, -120%);pointer-events:auto}
-    .iconBtn{width:40px;height:40px;border-radius:9999px;border:none;background:#111827;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer}
-    .chip{min-width:44px;height:28px;display:flex;align-items:center;justify-content:center;padding:0 8px;border-radius:9999px;background:#111827;color:#fff;font-weight:700;font-size:13px;border:1px solid #374151}
+    /* BARRE FIXE (dock) au bas de la caméra, ne bouge plus avec la fenêtre */
+    .dock{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:18;display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:9999px;background:rgba(11,18,32,.55);backdrop-filter: blur(8px);border:1px solid rgba(255,255,255,.16)}
+    .iconBtn{width:44px;height:44px;border-radius:9999px;border:1px solid rgba(255,255,255,.18);background:rgba(11,18,32,.75);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
+    .chip{min-width:52px;height:32px;display:flex;align-items:center;justify-content:center;padding:0 10px;border-radius:9999px;background:rgba(11,18,32,.75);color:#fff;font-weight:800;font-size:14px;border:1px solid rgba(255,255,255,.18)}
 
-    /* Sliders compacts (icônes) */
     .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .ctrl{display:flex;gap:6px;align-items:center}
-    .ctrl input[type=range]{width:160px}
+    .ctrl{display:flex;gap:8px;align-items:center}
+    .ctrl input[type=range]{width:180px}
 
-    /* Handle de drag transparent sur la fenêtre (pour éviter tout conflit d’overlay) */
-    #roiHandle{position:absolute;z-index:1150;border:none;background:transparent;cursor:grab}
+    #roiHandle{position:absolute;z-index:12;border:none;background:transparent;cursor:grab}
     #roiHandle:active{cursor:grabbing}
 
     #output{font-size:1.1rem}
-    .muted{color:#6b7280}
-    /* petit panneau d’erreur si besoin */
-    #err{display:none;margin:0 0 8px 0;padding:8px 10px;border-radius:8px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:.95rem}
+    .muted{color:var(--muted)}
+    #err{display:none;margin:0 0 8px 0;padding:8px 10px;border-radius:10px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:.95rem}
     #err.show{display:block}
   </style>
   <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
@@ -65,41 +66,37 @@
         <video id="preview" playsinline></video>
         <canvas id="frame" hidden></canvas>
 
-        <!-- Résultat 5s aligné sur la fenêtre -->
         <div id="roiResult"></div>
 
-        <!-- Barre d’icônes flottante au-dessus du ROI -->
-        <div id="roiToolbar" class="roiToolbar" aria-label="outils">
-          <button id="zoomOut" class="iconBtn" title="Zoom -">➖</button>
-          <div id="zoomChip" class="chip">1.5×</div>
-          <button id="zoomIn" class="iconBtn" title="Zoom +">➕</button>
-          <button id="swapCur" class="iconBtn" title="EUR ⇄ CZK">↔️</button>
-          <button id="presetFine" class="iconBtn" title="Ligne fine">≡</button>
-          <button id="toggleFS" class="iconBtn" title="Plein écran">⛶</button>
+        <!-- DOCK FIXE (ne bouge plus avec la ROI) -->
+        <div class="dock" id="dock">
+          <button id="zoomOut" class="iconBtn" title="Zoom -" aria-label="Zoom -">➖</button>
+          <div id="zoomChip" class="chip" aria-live="polite">1.5×</div>
+          <button id="zoomIn" class="iconBtn" title="Zoom +" aria-label="Zoom +">➕</button>
+          <button id="presetFine" class="iconBtn" title="Ligne fine" aria-label="Ligne fine">≡</button>
+          <button id="swapCur" class="iconBtn" title="Basculer EUR⇄CZK" aria-label="Basculer EUR⇄CZK">↔️</button>
+          <button id="toggleFS" class="iconBtn" title="Plein écran" aria-label="Plein écran">⛶</button>
         </div>
 
-        <!-- Bouton scan (au-dessus de tout) -->
         <button id="scanFloat" class="fab" title="Scanner" aria-label="Scanner">🔍</button>
 
-        <!-- Overlay masque avec trou (ne bloque pas les clics) -->
+        <!-- Overlay masque avec trou -->
         <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
           <defs>
             <mask id="cutout">
               <rect x="0" y="0" width="100" height="100" fill="white"/>
-              <rect id="holeMask" x="14" y="45" width="72" height="10" fill="black" rx="2" ry="2"/>
+              <rect id="holeMask" x="14" y="45" width="72" height="10" fill="black" rx="3" ry="3"/>
             </mask>
           </defs>
           <rect x="0" y="0" width="100" height="100" class="veil" mask="url(#cutout)"/>
-          <rect id="holeStroke" x="14" y="45" width="72" height="10" class="hole-stroke" rx="2" ry="2"/>
+          <rect id="holeStroke" x="14" y="45" width="72" height="10" class="hole-stroke" rx="3" ry="3"/>
         </svg>
 
-        <!-- Handle de drag invisible, pile sur la fenêtre -->
         <button id="roiHandle" aria-label="Déplacer la fenêtre"></button>
       </div>
     </section>
 
     <section class="card">
-      <!-- Contrôles compacts (icônes seulement) -->
       <div class="controls">
         <div class="ctrl" title="Largeur fenêtre">
           <span>↔️</span>
@@ -112,10 +109,11 @@
         <div class="ctrl" title="Devise cible">
           <span>💱</span>
           <select id="target">
-            <option value="EUR" selected>EUR</option>
-            <option value="CZK">CZK</option>
-            <option value="USD">USD</option>
-            <option value="GBP">GBP</option>
+            <option value="EUR" selected>EUR (€)</option>
+            <option value="CZK">CZK (Kč)</option>
+            <option value="USD">USD ($)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="ILS">ILS (₪)</option>
           </select>
         </div>
       </div>
@@ -130,102 +128,63 @@
 <script>
 (function(){
   const $ = id => document.getElementById(id);
-  const video = $('preview');
-  const canvas = $('frame');
-  const out = $('output');
-  const details = $('details');
-  const startBtn = $('startBtn');
-  const scanFloat = $('scanFloat');
-  const targetSel = $('target');
-  const roiW = $('roiW');
-  const roiH = $('roiH');
-  const holeMask = $('holeMask');
-  const holeStroke = $('holeStroke');
-  const wrap = $('wrap');
-  const roiResult = $('roiResult');
-  const toolbar = $('roiToolbar');
-  const zoomIn = $('zoomIn');
-  const zoomOut = $('zoomOut');
-  const zoomChip = $('zoomChip');
-  const presetFine = $('presetFine');
-  const swapCur = $('swapCur');
-  const toggleFS = $('toggleFS');
-  const roiHandle = $('roiHandle');
-  const errBox = $('err');
+  const video=$('preview'), canvas=$('frame'), out=$('output'), details=$('details');
+  const startBtn=$('startBtn'), scanFloat=$('scanFloat');
+  const targetSel=$('target'), roiW=$('roiW'), roiH=$('roiH');
+  const holeMask=$('holeMask'), holeStroke=$('holeStroke');
+  const wrap=$('wrap'), roiResult=$('roiResult');
+  const zoomIn=$('zoomIn'), zoomOut=$('zoomOut'), zoomChip=$('zoomChip');
+  const presetFine=$('presetFine'), swapCur=$('swapCur'), toggleFS=$('toggleFS');
+  const roiHandle=$('roiHandle'), errBox=$('err'), dock=$('dock');
 
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-  let stream=null; let hideTimer=null;
+  let hideTimer=null; let stream=null; let zoomFactor=1.5; // défaut
+  let roi={ x:14, y:45, w:72, h:10 };
 
-  // Zoom OCR (agrandit la ROI pour la lecture) par défaut 1.5×
-  let zoomFactor = 1.5; // [1.0 .. 3.0]
-
-  // ROI en % et verrouillage
-  let roi = { x:14, y:45, w:72, h:10 };
-
-  function showErr(msg){
-    errBox.textContent = msg;
-    errBox.classList.add('show');
-    setTimeout(()=>errBox.classList.remove('show'), 4000);
-  }
+  function showErr(msg){ errBox.textContent=msg; errBox.classList.add('show'); setTimeout(()=>errBox.classList.remove('show'),4000); }
 
   function applyRoi(){
-    roi.w = clamp(roi.w, 10, 95); roi.h = clamp(roi.h, 4, 22);
-    roi.x = clamp(roi.x, 0.5, 99.5 - roi.w); roi.y = clamp(roi.y, 0.5, 99.5 - roi.h);
-    for(const el of [holeMask, holeStroke]){
-      el.setAttribute('x', roi.x);
-      el.setAttribute('y', roi.y);
-      el.setAttribute('width', roi.w);
-      el.setAttribute('height', roi.h);
-    }
+    roi.w = clamp(roi.w,10,95); roi.h = clamp(roi.h,4,22);
+    roi.x = clamp(roi.x,0.5,99.5 - roi.w); roi.y = clamp(roi.y,0.5,99.5 - roi.h);
+    for(const el of [holeMask,holeStroke]){ el.setAttribute('x',roi.x); el.setAttribute('y',roi.y); el.setAttribute('width',roi.w); el.setAttribute('height',roi.h); }
     positionWidgets();
   }
 
   function positionWidgets(){
     const r = wrap.getBoundingClientRect();
-    // Toolbar centrée au-dessus du trou
-    const cx = r.width * (roi.x + roi.w/2) / 100;
-    const cy = r.height * (roi.y) / 100;
-    toolbar.style.left = cx + 'px';
-    toolbar.style.top  = cy + 'px';
-
-    // Pastille sous la fenêtre
+    // Pastille alignée sous le trou (ou dedans si dépassement) — comme avant
     const rrLeft = r.width * (roi.x) / 100;
     let rrTop = r.height * (roi.y + roi.h + 1.5) / 100;
     const rrWidth = r.width * (roi.w) / 100;
-    if(rrTop + 36 > r.height) rrTop = r.height * (roi.y + roi.h - 1.5) / 100 - 30;
-    roiResult.style.left = Math.round(rrLeft) + 'px';
-    roiResult.style.top  = Math.round(rrTop) + 'px';
-    roiResult.style.width= Math.max(120, Math.round(rrWidth)) + 'px';
-
-    // Handle de drag pile sur le trou
-    const hx = r.width * (roi.x) / 100;
-    const hy = r.height * (roi.y) / 100;
-    const hw = r.width * (roi.w) / 100;
-    const hh = r.height * (roi.h) / 100;
-    Object.assign(roiHandle.style, {
-      left: Math.round(hx) + 'px',
-      top:  Math.round(hy) + 'px',
-      width: Math.round(hw) + 'px',
-      height: Math.round(hh) + 'px'
+    if(rrTop + 40 > r.height) rrTop = r.height * (roi.y + roi.h - 1.5) / 100 - 30;
+    Object.assign(roiResult.style, {
+      left: Math.round(rrLeft) + 'px',
+      top:  Math.round(rrTop)  + 'px',
+      width: Math.max(140, Math.round(rrWidth)) + 'px'
     });
+
+    // Handle de drag sur le trou
+    const hx = r.width * (roi.x) / 100, hy = r.height * (roi.y) / 100;
+    const hw = r.width * (roi.w) / 100, hh = r.height * (roi.h) / 100;
+    Object.assign(roiHandle.style, { left: hx+'px', top: hy+'px', width: hw+'px', height: hh+'px' });
   }
 
-  function syncInputs(){ roiW.value = roi.w; roiH.value = roi.h; }
+  function syncInputs(){ roiW.value=roi.w; roiH.value=roi.h; }
   function updateFromInputs(){ roi.w=parseInt(roiW.value,10); roi.h=parseInt(roiH.value,10); roi.x=(100-roi.w)/2; roi.y=(100-roi.h)/2; applyRoi(); }
   roiW.addEventListener('input', updateFromInputs);
   roiH.addEventListener('input', updateFromInputs);
   window.addEventListener('resize', positionWidgets);
 
   presetFine.addEventListener('click', ()=>{ roi.w=80; roi.h=6; roi.x=(100-roi.w)/2; roi.y=(100-roi.h)/2; syncInputs(); applyRoi(); });
-  swapCur.addEventListener('click', ()=>{ const v=targetSel.value; targetSel.value = (v==='EUR') ? 'CZK' : (v==='CZK' ? 'EUR' : 'EUR'); });
+  swapCur.addEventListener('click', ()=>{ const v=targetSel.value; // bascule rapides EUR<->CZK (si autre, met EUR)
+    targetSel.value = (v==='EUR')?'CZK':(v==='CZK'?'EUR':'EUR'); });
 
-  // Zoom boutons (+/-)
-  function setZoom(z){ zoomFactor = clamp(parseFloat(z.toFixed(2)), 1.0, 3.0); zoomChip.textContent = zoomFactor+'×'; }
+  function setZoom(z){ zoomFactor = clamp(parseFloat(z.toFixed(2)),1.0,3.0); zoomChip.textContent = zoomFactor+'×'; }
   zoomIn.addEventListener('click', ()=> setZoom(zoomFactor+0.25));
   zoomOut.addEventListener('click', ()=> setZoom(zoomFactor-0.25));
   setZoom(zoomFactor);
 
-  // Drag via handle (évite conflit overlay)
+  // Drag via handle (ne chevauche pas la dock)
   let dragging=false, start={x:0,y:0}, roiStart={x:0,y:0};
   function pt(e){ const t=e.touches?e.touches[0]:e; const rect=wrap.getBoundingClientRect(); return {px:clamp((t.clientX-rect.left)/rect.width*100,0,100), py:clamp((t.clientY-rect.top)/rect.height*100,0,100)}; }
   function onDown(e){ dragging=true; const {px,py}=pt(e); start={x:px,y:py}; roiStart={x:roi.x,y:roi.y}; e.preventDefault(); }
@@ -235,22 +194,25 @@
   roiHandle.addEventListener('touchstart', onDown, {passive:false}); roiHandle.addEventListener('touchmove', onMove, {passive:false}); roiHandle.addEventListener('touchend', onUp);
 
   const CURRENCY_HINTS=[
-    {code:'EUR',match:/(€|\\beur\\b|\\beuro\\b)/i},
-    {code:'CZK',match:/(\\bczk\\b|kč|\\bkc\\b|koruna|couronne)/i},
-    {code:'USD',match:/(\\$|\\busd\\b|\\bus\\s*d\\b)/i},
-    {code:'GBP',match:/(£|\\bgbp\\b|pound|livre)/i}
+    {code:'EUR',match:/(€|\beur\b|\beuro\b)/i},
+    {code:'CZK',match:/(\bczk\b|kč|\bkc\b|koruna|couronne)/i},
+    {code:'USD',match:/(\$|\busd\b|\bus\s*d\b)/i},
+    {code:'GBP',match:/(£|\bgbp\b|pound|livre)/i},
+    {code:'ILS',match:/(₪|\bils\b|shekel|sheqel|ש"ח|שקל)/i}
   ];
+
   function extractAmountAndCurrency(text){
-    const line=text.replace(/\\n+/g,' ').trim();
-    const numberRegex=/([0-9]{1,3}(?:[\\s.,][0-9]{3})*|[0-9]+)(?:[\\s.,][0-9]{1,2})?/g;
+    const line=text.replace(/\n+/g,' ').trim();
+    const numberRegex=/([0-9]{1,3}(?:[\s.,][0-9]{3})*|[0-9]+)(?:[\s.,][0-9]{1,2})?/g;
     const candidates=[]; let m; while((m=numberRegex.exec(line))!==null) candidates.push({raw:m[0]});
     if(!candidates.length) return null; let cur='CZK';
-    for(const h of CURRENCY_HINTS){ if(h.match.test(line)){cur=h.code;break;} }
+    for(const h of CURRENCY_HINTS){ if(h.match.test(line)){ cur=h.code; break; } }
     candidates.sort((a,b)=>b.raw.length-a.raw.length);
     const pick=candidates[0];
-    const amount=parseFloat(pick.raw.replace(/\\s/g,'').replace(',', '.'));
+    const amount=parseFloat(pick.raw.replace(/\s/g,'').replace(',', '.'));
     if(isNaN(amount)) return null; return {amount,srcCur:cur,raw:line};
   }
+
   async function getRate(src,tgt){
     if(src===tgt) return 1;
     const url=`https://api.frankfurter.app/latest?amount=1&from=${encodeURIComponent(src)}&to=${encodeURIComponent(tgt)}`;
@@ -259,12 +221,14 @@
     const data=await res.json();
     return data.rates[tgt];
   }
+
   function badgeCss(cur){
     switch(cur){
       case 'CZK': return 'linear-gradient(90deg, rgba(6,182,212,.92), rgba(8,145,178,.92))';
       case 'EUR': return 'linear-gradient(90deg, rgba(22,163,74,.92), rgba(21,128,61,.92))';
       case 'USD': return 'linear-gradient(90deg, rgba(245,158,11,.92), rgba(217,119,6,.92))';
       case 'GBP': return 'linear-gradient(90deg, rgba(139,92,246,.92), rgba(124,58,237,.92))';
+      case 'ILS': return 'linear-gradient(90deg, rgba(59,130,246,.92), rgba(37,99,235,.92))';
       default: return 'rgba(17,24,39,.88)';
     }
   }
@@ -280,32 +244,27 @@
       const outW = Math.round(rw*zoomFactor), outH = Math.round(rh*zoomFactor);
       crop.width=outW; crop.height=outH; cctx.imageSmoothingEnabled=true; cctx.drawImage(canvas,rx,ry,rw,rh,0,0,outW,outH);
 
-      const {data:{text}}=await Tesseract.recognize(crop,'eng+fra',{tessedit_pageseg_mode:7});
+      const {data:{text}}=await Tesseract.recognize(crop,'eng+fra',{ tessedit_pageseg_mode:7 });
       const parsed=extractAmountAndCurrency(text); if(!parsed){ out.textContent='Rien d\'exploitable'; details.textContent=''; return; }
       const tgt=targetSel.value; const rate=await getRate(parsed.srcCur,tgt); const converted=parsed.amount*rate;
 
       roiResult.textContent=`${parsed.amount.toFixed(2)} ${parsed.srcCur} ≈ ${converted.toFixed(2)} ${tgt}`;
       roiResult.style.background = badgeCss(parsed.srcCur);
-      positionWidgets(); roiResult.classList.add('show'); hideTimer=setTimeout(()=>roiResult.classList.remove('show'),5000);
+      positionWidgets(); roiResult.classList.add('show'); setTimeout(()=>roiResult.classList.remove('show'),5000);
 
       out.innerHTML=`🧮 <strong>${parsed.amount.toFixed(2)} ${parsed.srcCur}</strong> ≈ <strong>${converted.toFixed(2)} ${tgt}</strong>`;
       details.innerHTML=`Taux: 1 ${parsed.srcCur} = ${rate.toFixed(4)} ${tgt}<br><span class="muted">OCR: ${parsed.raw.substring(0,160).replace(/</g,'&lt;')}…</span>`;
-    }catch(err){
-      showErr(err.message||String(err));
-    }finally{
-      scanFloat.disabled=false;
-    }
+    }catch(err){ showErr(err.message||String(err)); }
+    finally{ scanFloat.disabled=false; }
   }
 
   startBtn.addEventListener('click', async ()=>{
     try{
-      stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
       video.srcObject = stream; await video.play();
-      scanFloat.addEventListener('click', doScan, { once:false });
-      applyRoi(); // positionne tout une fois la vidéo prête
-    }catch(e){
-      showErr("Impossible d’accéder à la caméra. Vérifie les permissions et HTTPS.");
-    }
+      scanFloat.addEventListener('click', doScan);
+      applyRoi();
+    }catch(e){ showErr("Impossible d’accéder à la caméra. Vérifie les permissions et HTTPS."); }
   });
 
   toggleFS.addEventListener('click', async ()=>{
@@ -316,7 +275,7 @@
   document.addEventListener('fullscreenchange', ()=>{ if(!document.fullscreenElement){ document.body.classList.remove('fullscreen'); positionWidgets(); } });
 
   // init
-  (function(){ applyRoi(); })();
+  applyRoi();
 })();
 </script>
 </body>
