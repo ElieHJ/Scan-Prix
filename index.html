@@ -5,71 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Scan prix → € (v12: ILS + barre fixe + rendu)</title>
   <meta name="theme-color" content="#0b1220"/>
-  <style>
-    :root{
-      --ink:#0b1220; --bg:#f6f7fb; --card:#ffffff;
-      --veil: rgba(0,0,0,.28); --accent:#22d3ee;
-      --btn:#0b1220; --btn-ink:#fff; --muted:#6b7280;
-    }
-    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:var(--bg);color:var(--ink)}
-    /* Barre top, caméra */
-    header{position:sticky;top:0;z-index:1000;padding:10px;background:var(--ink);color:#fff;display:flex;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.16)}
-    #startBtn{padding:10px 16px;border-radius:9999px;border:1px solid #243041;background:transparent;color:#fff;font-weight:700;backdrop-filter: blur(6px)}
-
-    main{padding:12px;display:grid;gap:12px;max-width:980px;margin:auto}
-    .card{border:1px solid #e5e7eb;border-radius:18px;padding:12px;box-shadow:0 8px 28px rgba(10,23,40,.08);background:var(--card)}
-
-    /* Caméra */
-    #wrap{position:relative;height:74vh;max-height:84vh;border-radius:18px;overflow:hidden;background:#000}
-    #preview{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
-    #overlay{position:absolute;inset:0;pointer-events:none;z-index:5}
-
-    .veil{fill:var(--veil)}
-    .hole-stroke{fill:none;stroke:var(--accent);stroke-width:0.9}
-
-    /* Bouton scan */
-    .fab{position:absolute;z-index:20;width:56px;height:56px;border-radius:9999px;border:none;background:var(--btn);color:var(--btn-ink);box-shadow:0 10px 26px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer}
-    #scanFloat{right:12px;bottom:12px}
-
-    /* Pastille sous la fenêtre (5s) */
-    #roiResult{position:absolute;z-index:15;color:#fff;padding:8px 12px;border-radius:12px;font-weight:800;font-size:15px;box-shadow:0 10px 26px rgba(0,0,0,.35);opacity:0;transition:opacity .18s ease, background-color .18s ease; text-align:center; pointer-events:none}
-    #roiResult.show{opacity:1}
-
-    /* BARRE FIXE (dock) au bas de la caméra, ne bouge plus avec la fenêtre */
-    .dock{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:18;display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:9999px;background:rgba(11,18,32,.55);backdrop-filter: blur(8px);border:1px solid rgba(255,255,255,.16)}
-    .iconBtn{width:44px;height:44px;border-radius:9999px;border:1px solid rgba(255,255,255,.18);background:rgba(11,18,32,.75);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
-    .chip{min-width:52px;height:32px;display:flex;align-items:center;justify-content:center;padding:0 10px;border-radius:9999px;background:rgba(11,18,32,.75);color:#fff;font-weight:800;font-size:14px;border:1px solid rgba(255,255,255,.18)}
-
-    .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .ctrl{display:flex;gap:8px;align-items:center}
-    .ctrl input[type=range]{width:180px}
-
-    #roiHandle{position:absolute;z-index:12;border:none;background:transparent;cursor:grab}
-    #roiHandle:active{cursor:grabbing}
-
-    #output{font-size:1.1rem}
-    .muted{color:var(--muted)}
-    #err{display:none;margin:0 0 8px 0;padding:8px 10px;border-radius:10px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:.95rem}
-    #err.show{display:block}
-  </style>
-  <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js" crossorigin="anonymous" defer></script>
+  <script src="assets/main.js" defer></script>
 </head>
 <body>
   <header>
-    <button id="startBtn">Activer la caméra</button>
+    <div class="hdr-left">
+      <button id="startBtn" aria-pressed="false">Activer la caméra</button>
+      <span id="camState" class="muted">Caméra : inactif</span>
+    </div>
+    <div class="hdr-right">
+      <button id="helpBtn" title="Aide rapide">❔</button>
+    </div>
   </header>
 
   <main>
     <section class="card">
-      <div id="err"></div>
+      <div id="err" role="alert" aria-live="polite"></div>
       <div id="wrap">
-        <video id="preview" playsinline></video>
+        <video id="preview" playsinline aria-hidden="false"></video>
         <canvas id="frame" hidden></canvas>
 
-        <div id="roiResult"></div>
+        <div id="roiResult" role="status" aria-live="polite"></div>
 
-        <!-- DOCK FIXE (ne bouge plus avec la ROI) -->
-        <div class="dock" id="dock">
+        <div class="dock" id="dock" aria-hidden="false">
           <button id="zoomOut" class="iconBtn" title="Zoom -" aria-label="Zoom -">➖</button>
           <div id="zoomChip" class="chip" aria-live="polite">1.5×</div>
           <button id="zoomIn" class="iconBtn" title="Zoom +" aria-label="Zoom +">➕</button>
@@ -78,10 +38,12 @@
           <button id="toggleFS" class="iconBtn" title="Plein écran" aria-label="Plein écran">⛶</button>
         </div>
 
-        <button id="scanFloat" class="fab" title="Scanner" aria-label="Scanner">🔍</button>
+        <button id="scanFloat" class="fab" title="Scanner" aria-label="Scanner">
+          <span id="scanIcon">🔍</span>
+          <span id="scanSpinner" class="spinner" hidden></span>
+        </button>
 
-        <!-- Overlay masque avec trou -->
-        <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <mask id="cutout">
               <rect x="0" y="0" width="100" height="100" fill="white"/>
@@ -99,21 +61,31 @@
     <section class="card">
       <div class="controls">
         <div class="ctrl" title="Largeur fenêtre">
-          <span>↔️</span>
+          <label for="roiW">Largeur</label>
           <input type="range" id="roiW" min="30" max="95" value="72"/>
         </div>
         <div class="ctrl" title="Hauteur fenêtre">
-          <span>↕️</span>
+          <label for="roiH">Hauteur</label>
           <input type="range" id="roiH" min="4" max="18" value="10"/>
         </div>
         <div class="ctrl" title="Devise cible">
-          <span>💱</span>
+          <label for="target">Devise</label>
           <select id="target">
             <option value="EUR" selected>EUR (€)</option>
             <option value="CZK">CZK (Kč)</option>
             <option value="USD">USD ($)</option>
             <option value="GBP">GBP (£)</option>
             <option value="ILS">ILS (₪)</option>
+          </select>
+        </div>
+        <div class="ctrl">
+          <label for="tessLang">Langues OCR</label>
+          <select id="tessLang">
+            <option value="eng+fra" selected>eng+fra</option>
+            <option value="eng">eng</option>
+            <option value="fra">fra</option>
+            <option value="deu">deu</option>
+            <option value="spa">spa</option>
           </select>
         </div>
       </div>
@@ -125,158 +97,6 @@
     </section>
   </main>
 
-<script>
-(function(){
-  const $ = id => document.getElementById(id);
-  const video=$('preview'), canvas=$('frame'), out=$('output'), details=$('details');
-  const startBtn=$('startBtn'), scanFloat=$('scanFloat');
-  const targetSel=$('target'), roiW=$('roiW'), roiH=$('roiH');
-  const holeMask=$('holeMask'), holeStroke=$('holeStroke');
-  const wrap=$('wrap'), roiResult=$('roiResult');
-  const zoomIn=$('zoomIn'), zoomOut=$('zoomOut'), zoomChip=$('zoomChip');
-  const presetFine=$('presetFine'), swapCur=$('swapCur'), toggleFS=$('toggleFS');
-  const roiHandle=$('roiHandle'), errBox=$('err'), dock=$('dock');
-
-  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-  let hideTimer=null; let stream=null; let zoomFactor=1.5; // défaut
-  let roi={ x:14, y:45, w:72, h:10 };
-
-  function showErr(msg){ errBox.textContent=msg; errBox.classList.add('show'); setTimeout(()=>errBox.classList.remove('show'),4000); }
-
-  function applyRoi(){
-    roi.w = clamp(roi.w,10,95); roi.h = clamp(roi.h,4,22);
-    roi.x = clamp(roi.x,0.5,99.5 - roi.w); roi.y = clamp(roi.y,0.5,99.5 - roi.h);
-    for(const el of [holeMask,holeStroke]){ el.setAttribute('x',roi.x); el.setAttribute('y',roi.y); el.setAttribute('width',roi.w); el.setAttribute('height',roi.h); }
-    positionWidgets();
-  }
-
-  function positionWidgets(){
-    const r = wrap.getBoundingClientRect();
-    // Pastille alignée sous le trou (ou dedans si dépassement) — comme avant
-    const rrLeft = r.width * (roi.x) / 100;
-    let rrTop = r.height * (roi.y + roi.h + 1.5) / 100;
-    const rrWidth = r.width * (roi.w) / 100;
-    if(rrTop + 40 > r.height) rrTop = r.height * (roi.y + roi.h - 1.5) / 100 - 30;
-    Object.assign(roiResult.style, {
-      left: Math.round(rrLeft) + 'px',
-      top:  Math.round(rrTop)  + 'px',
-      width: Math.max(140, Math.round(rrWidth)) + 'px'
-    });
-
-    // Handle de drag sur le trou
-    const hx = r.width * (roi.x) / 100, hy = r.height * (roi.y) / 100;
-    const hw = r.width * (roi.w) / 100, hh = r.height * (roi.h) / 100;
-    Object.assign(roiHandle.style, { left: hx+'px', top: hy+'px', width: hw+'px', height: hh+'px' });
-  }
-
-  function syncInputs(){ roiW.value=roi.w; roiH.value=roi.h; }
-  function updateFromInputs(){ roi.w=parseInt(roiW.value,10); roi.h=parseInt(roiH.value,10); roi.x=(100-roi.w)/2; roi.y=(100-roi.h)/2; applyRoi(); }
-  roiW.addEventListener('input', updateFromInputs);
-  roiH.addEventListener('input', updateFromInputs);
-  window.addEventListener('resize', positionWidgets);
-
-  presetFine.addEventListener('click', ()=>{ roi.w=80; roi.h=6; roi.x=(100-roi.w)/2; roi.y=(100-roi.h)/2; syncInputs(); applyRoi(); });
-  swapCur.addEventListener('click', ()=>{ const v=targetSel.value; // bascule rapides EUR<->CZK (si autre, met EUR)
-    targetSel.value = (v==='EUR')?'CZK':(v==='CZK'?'EUR':'EUR'); });
-
-  function setZoom(z){ zoomFactor = clamp(parseFloat(z.toFixed(2)),1.0,3.0); zoomChip.textContent = zoomFactor+'×'; }
-  zoomIn.addEventListener('click', ()=> setZoom(zoomFactor+0.25));
-  zoomOut.addEventListener('click', ()=> setZoom(zoomFactor-0.25));
-  setZoom(zoomFactor);
-
-  // Drag via handle (ne chevauche pas la dock)
-  let dragging=false, start={x:0,y:0}, roiStart={x:0,y:0};
-  function pt(e){ const t=e.touches?e.touches[0]:e; const rect=wrap.getBoundingClientRect(); return {px:clamp((t.clientX-rect.left)/rect.width*100,0,100), py:clamp((t.clientY-rect.top)/rect.height*100,0,100)}; }
-  function onDown(e){ dragging=true; const {px,py}=pt(e); start={x:px,y:py}; roiStart={x:roi.x,y:roi.y}; e.preventDefault(); }
-  function onMove(e){ if(!dragging) return; const {px,py}=pt(e); roi.x = roiStart.x + (px-start.x); roi.y = roiStart.y + (py-start.y); applyRoi(); e.preventDefault(); }
-  function onUp(){ dragging=false; }
-  roiHandle.addEventListener('mousedown', onDown); roiHandle.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
-  roiHandle.addEventListener('touchstart', onDown, {passive:false}); roiHandle.addEventListener('touchmove', onMove, {passive:false}); roiHandle.addEventListener('touchend', onUp);
-
-  const CURRENCY_HINTS=[
-    {code:'EUR',match:/(€|\beur\b|\beuro\b)/i},
-    {code:'CZK',match:/(\bczk\b|kč|\bkc\b|koruna|couronne)/i},
-    {code:'USD',match:/(\$|\busd\b|\bus\s*d\b)/i},
-    {code:'GBP',match:/(£|\bgbp\b|pound|livre)/i},
-    {code:'ILS',match:/(₪|\bils\b|shekel|sheqel|ש"ח|שקל)/i}
-  ];
-
-  function extractAmountAndCurrency(text){
-    const line=text.replace(/\n+/g,' ').trim();
-    const numberRegex=/([0-9]{1,3}(?:[\s.,][0-9]{3})*|[0-9]+)(?:[\s.,][0-9]{1,2})?/g;
-    const candidates=[]; let m; while((m=numberRegex.exec(line))!==null) candidates.push({raw:m[0]});
-    if(!candidates.length) return null; let cur='CZK';
-    for(const h of CURRENCY_HINTS){ if(h.match.test(line)){ cur=h.code; break; } }
-    candidates.sort((a,b)=>b.raw.length-a.raw.length);
-    const pick=candidates[0];
-    const amount=parseFloat(pick.raw.replace(/\s/g,'').replace(',', '.'));
-    if(isNaN(amount)) return null; return {amount,srcCur:cur,raw:line};
-  }
-
-  async function getRate(src,tgt){
-    if(src===tgt) return 1;
-    const url=`https://api.frankfurter.app/latest?amount=1&from=${encodeURIComponent(src)}&to=${encodeURIComponent(tgt)}`;
-    const res=await fetch(url);
-    if(!res.ok) throw new Error('Taux introuvable');
-    const data=await res.json();
-    return data.rates[tgt];
-  }
-
-  function badgeCss(cur){
-    switch(cur){
-      case 'CZK': return 'linear-gradient(90deg, rgba(6,182,212,.92), rgba(8,145,178,.92))';
-      case 'EUR': return 'linear-gradient(90deg, rgba(22,163,74,.92), rgba(21,128,61,.92))';
-      case 'USD': return 'linear-gradient(90deg, rgba(245,158,11,.92), rgba(217,119,6,.92))';
-      case 'GBP': return 'linear-gradient(90deg, rgba(139,92,246,.92), rgba(124,58,237,.92))';
-      case 'ILS': return 'linear-gradient(90deg, rgba(59,130,246,.92), rgba(37,99,235,.92))';
-      default: return 'rgba(17,24,39,.88)';
-    }
-  }
-
-  async function doScan(){
-    try{
-      details.textContent='Lecture…'; scanFloat.disabled=true; roiResult.classList.remove('show'); if(hideTimer){ clearTimeout(hideTimer); hideTimer=null; }
-      const vw=video.videoWidth, vh=video.videoHeight;
-      if(!vw||!vh){ details.textContent='Caméra non prête'; scanFloat.disabled=false; return; }
-      canvas.width=vw; canvas.height=vh; const ctx=canvas.getContext('2d'); ctx.drawImage(video,0,0,vw,vh);
-      const rx=Math.round(vw*roi.x/100), ry=Math.round(vh*roi.y/100), rw=Math.round(vw*roi.w/100), rh=Math.round(vh*roi.h/100);
-      const crop=document.createElement('canvas'); const cctx=crop.getContext('2d');
-      const outW = Math.round(rw*zoomFactor), outH = Math.round(rh*zoomFactor);
-      crop.width=outW; crop.height=outH; cctx.imageSmoothingEnabled=true; cctx.drawImage(canvas,rx,ry,rw,rh,0,0,outW,outH);
-
-      const {data:{text}}=await Tesseract.recognize(crop,'eng+fra',{ tessedit_pageseg_mode:7 });
-      const parsed=extractAmountAndCurrency(text); if(!parsed){ out.textContent='Rien d\'exploitable'; details.textContent=''; return; }
-      const tgt=targetSel.value; const rate=await getRate(parsed.srcCur,tgt); const converted=parsed.amount*rate;
-
-      roiResult.textContent=`${parsed.amount.toFixed(2)} ${parsed.srcCur} ≈ ${converted.toFixed(2)} ${tgt}`;
-      roiResult.style.background = badgeCss(parsed.srcCur);
-      positionWidgets(); roiResult.classList.add('show'); setTimeout(()=>roiResult.classList.remove('show'),5000);
-
-      out.innerHTML=`🧮 <strong>${parsed.amount.toFixed(2)} ${parsed.srcCur}</strong> ≈ <strong>${converted.toFixed(2)} ${tgt}</strong>`;
-      details.innerHTML=`Taux: 1 ${parsed.srcCur} = ${rate.toFixed(4)} ${tgt}<br><span class="muted">OCR: ${parsed.raw.substring(0,160).replace(/</g,'&lt;')}…</span>`;
-    }catch(err){ showErr(err.message||String(err)); }
-    finally{ scanFloat.disabled=false; }
-  }
-
-  startBtn.addEventListener('click', async ()=>{
-    try{
-      const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
-      video.srcObject = stream; await video.play();
-      scanFloat.addEventListener('click', doScan);
-      applyRoi();
-    }catch(e){ showErr("Impossible d’accéder à la caméra. Vérifie les permissions et HTTPS."); }
-  });
-
-  toggleFS.addEventListener('click', async ()=>{
-    document.body.classList.add('fullscreen');
-    if(document.documentElement.requestFullscreen){ try{ await document.documentElement.requestFullscreen(); }catch{} }
-    positionWidgets();
-  });
-  document.addEventListener('fullscreenchange', ()=>{ if(!document.fullscreenElement){ document.body.classList.remove('fullscreen'); positionWidgets(); } });
-
-  // init
-  applyRoi();
-})();
-</script>
+  <footer class="muted small">Usage local • images traitées en local • taux fournis par frankfurter.app</footer>
 </body>
 </html>
