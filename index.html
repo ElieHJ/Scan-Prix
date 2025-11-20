@@ -158,7 +158,22 @@
         
         <!-- Menu Settings Popover -->
         <div id="settingsPanel" class="absolute bottom-16 left-0 w-64 bg-slate-800/95 backdrop-blur-xl border border-slate-700 p-4 rounded-2xl shadow-2xl transition-all duration-200 opacity-0 translate-y-4 pointer-events-none z-50 origin-bottom-left">
-            <h3 class="text-xs font-bold text-slate-400 uppercase mb-3">Taille de la fenêtre</h3>
+            
+            <!-- Section Monnaie d'origine (NOUVEAU) -->
+            <div class="mb-4">
+                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Monnaie d'origine (Scan)</h3>
+                <select id="sourceSel" class="w-full bg-slate-700 text-white text-xs rounded-lg p-2 border border-slate-600 outline-none focus:border-cyan-400">
+                    <option value="AUTO" selected>✨ Auto-détection (Défaut)</option>
+                    <option value="CZK">🇨🇿 CZK (Couronne)</option>
+                    <option value="EUR">🇪🇺 EUR (Euro)</option>
+                    <option value="USD">🇺🇸 USD (Dollar)</option>
+                    <option value="GBP">🇬🇧 GBP (Livre)</option>
+                    <option value="ILS">🇮🇱 ILS (Shekel)</option>
+                </select>
+                <p class="text-[10px] text-slate-500 mt-1 leading-tight">Forcez une devise si le symbole n'est pas détecté.</p>
+            </div>
+
+            <h3 class="text-xs font-bold text-slate-400 uppercase mb-3 pt-3 border-t border-slate-700">Taille de la fenêtre</h3>
             <div class="space-y-4">
                 <div>
                     <div class="flex justify-between text-xs mb-1 text-slate-300"><span>Largeur</span><span id="valW">72%</span></div>
@@ -196,7 +211,7 @@
   const video=$('preview'), canvas=$('frame');
   const startBtn=$('startBtn'), startOverlay=$('startOverlay'), statusDot=$('statusDot');
   const scanFloat=$('scanFloat'), scanIcon=$('scanIcon'), loadingIcon=$('loadingIcon');
-  const targetSel=$('target');
+  const targetSel=$('target'), sourceSel=$('sourceSel');
   
   // Settings
   const settingsPanel=$('settingsPanel'), toggleSettings=$('toggleSettings');
@@ -351,7 +366,7 @@
     {code:'ILS',match:/(₪|\bils\b|shekel|sheqel|ש"ח|שקל)/i}
   ];
 
-  function extractAmountAndCurrency(text){
+  function extractAmountAndCurrency(text, forcedSource){
     const line=text.replace(/\n+/g,' ').trim();
     // Regex légèrement améliorée
     const numberRegex=/([0-9]{1,3}(?:[\s.,][0-9]{3})*|[0-9]+)(?:[\s.,][0-9]{1,2})?/g;
@@ -360,8 +375,21 @@
     
     if(!candidates.length) return null; 
     
-    let cur='CZK'; // default logic from original
-    for(const h of CURRENCY_HINTS){ if(h.match.test(line)){ cur=h.code; break; } }
+    let cur = 'CZK'; // default fallback
+    let detected = false;
+
+    if (forcedSource && forcedSource !== 'AUTO') {
+        cur = forcedSource;
+        detected = true;
+    } else {
+        // Auto-detect logic
+        for(const h of CURRENCY_HINTS){ 
+            if(h.match.test(line)){ cur=h.code; detected=true; break; } 
+        }
+    }
+    
+    // Si en mode AUTO et rien détecté, on peut soit retourner null, soit assumer CZK par défaut
+    // Ici, on garde le comportement original (défaut CZK) mais on pourrait être plus strict.
     
     // Sort by length (heuristic assumption: longer number usually amount in price tags)
     candidates.sort((a,b)=>b.raw.length-a.raw.length);
@@ -375,7 +403,7 @@
     
     const amount=parseFloat(cleanNum);
     if(isNaN(amount)) return null; 
-    return {amount,srcCur:cur,raw:line};
+    return {amount,srcCur:cur,raw:line, isManual: (forcedSource && forcedSource!=='AUTO')};
   }
 
   async function getRate(src,tgt){
@@ -457,7 +485,8 @@
           tessedit_pageseg_mode:7 // Single line mode
       });
       
-      const parsed=extractAmountAndCurrency(text); 
+      const forced = sourceSel.value;
+      const parsed=extractAmountAndCurrency(text, forced); 
       
       if(!parsed){ 
           showResult("Non détecté", "Essayez de stabiliser ou zoomer", false); 
@@ -469,9 +498,10 @@
       const converted=parsed.amount*rate;
 
       // Success Display
+      const manualLabel = parsed.isManual ? ' (Fixé)' : '';
       showResult(
           `${converted.toFixed(2)} <small>${tgt}</small>`, 
-          `Source: ${parsed.amount.toFixed(2)} ${parsed.srcCur}`
+          `Source: ${parsed.amount.toFixed(2)} ${parsed.srcCur}${manualLabel}`
       );
 
     }catch(err){ 
