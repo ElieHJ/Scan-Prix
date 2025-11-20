@@ -2,197 +2,344 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scan prix → € (v12: ILS + barre fixe + rendu)</title>
-  <meta name="theme-color" content="#0b1220"/>
-  <style>
-    :root{
-      --ink:#0b1220; --bg:#f6f7fb; --card:#ffffff;
-      --veil: rgba(0,0,0,.28); --accent:#22d3ee;
-      --btn:#0b1220; --btn-ink:#fff; --muted:#6b7280;
-    }
-    html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:var(--bg);color:var(--ink)}
-    /* Barre top, caméra */
-    header{position:sticky;top:0;z-index:1000;padding:10px;background:var(--ink);color:#fff;display:flex;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.16)}
-    #startBtn{padding:10px 16px;border-radius:9999px;border:1px solid #243041;background:transparent;color:#fff;font-weight:700;backdrop-filter: blur(6px)}
-
-    main{padding:12px;display:grid;gap:12px;max-width:980px;margin:auto}
-    .card{border:1px solid #e5e7eb;border-radius:18px;padding:12px;box-shadow:0 8px 28px rgba(10,23,40,.08);background:var(--card)}
-
-    /* Caméra */
-    #wrap{position:relative;height:74vh;max-height:84vh;border-radius:18px;overflow:hidden;background:#000}
-    #preview{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
-    #overlay{position:absolute;inset:0;pointer-events:none;z-index:5}
-
-    .veil{fill:var(--veil)}
-    .hole-stroke{fill:none;stroke:var(--accent);stroke-width:0.9}
-
-    /* Bouton scan */
-    .fab{position:absolute;z-index:20;width:56px;height:56px;border-radius:9999px;border:none;background:var(--btn);color:var(--btn-ink);box-shadow:0 10px 26px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer}
-    #scanFloat{right:12px;bottom:12px}
-
-    /* Pastille sous la fenêtre (5s) */
-    #roiResult{position:absolute;z-index:15;color:#fff;padding:8px 12px;border-radius:12px;font-weight:800;font-size:15px;box-shadow:0 10px 26px rgba(0,0,0,.35);opacity:0;transition:opacity .18s ease, background-color .18s ease; text-align:center; pointer-events:none}
-    #roiResult.show{opacity:1}
-
-    /* BARRE FIXE (dock) au bas de la caméra, ne bouge plus avec la fenêtre */
-    .dock{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:18;display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:9999px;background:rgba(11,18,32,.55);backdrop-filter: blur(8px);border:1px solid rgba(255,255,255,.16)}
-    .iconBtn{width:44px;height:44px;border-radius:9999px;border:1px solid rgba(255,255,255,.18);background:rgba(11,18,32,.75);color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
-    .chip{min-width:52px;height:32px;display:flex;align-items:center;justify-content:center;padding:0 10px;border-radius:9999px;background:rgba(11,18,32,.75);color:#fff;font-weight:800;font-size:14px;border:1px solid rgba(255,255,255,.18)}
-
-    .controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .ctrl{display:flex;gap:8px;align-items:center}
-    .ctrl input[type=range]{width:180px}
-
-    #roiHandle{position:absolute;z-index:12;border:none;background:transparent;cursor:grab}
-    #roiHandle:active{cursor:grabbing}
-
-    #output{font-size:1.1rem}
-    .muted{color:var(--muted)}
-    #err{display:none;margin:0 0 8px 0;padding:8px 10px;border-radius:10px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;font-size:.95rem}
-    #err.show{display:block}
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Price Scanner Pro</title>
+  <meta name="theme-color" content="#0f172a"/>
+  
+  <!-- Tailwind CSS pour le styling moderne -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tesseract JS -->
   <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
+  <!-- Police Google Fonts (Inter) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: white; overflow: hidden; }
+    
+    /* Effet de scan animation */
+    @keyframes scanner-line {
+      0% { top: 0%; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+    .scan-beam {
+      position: absolute;
+      left: 0; width: 100%; height: 2px;
+      background: #22d3ee;
+      box-shadow: 0 0 10px #22d3ee, 0 0 20px #22d3ee;
+      animation: scanner-line 2s infinite linear;
+      display: none;
+    }
+    .scanning .scan-beam { display: block; }
+
+    /* Slider styling */
+    input[type=range] {
+      -webkit-appearance: none; background: transparent; width: 100%;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+      background: #22d3ee; cursor: pointer; margin-top: -6px; box-shadow: 0 0 10px rgba(34,211,238,0.5);
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%; height: 4px; cursor: pointer; background: #334155; border-radius: 2px;
+    }
+    
+    /* Masquer la scrollbar */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
 </head>
-<body>
-  <header>
-    <button id="startBtn">Activer la caméra</button>
+<body class="h-screen w-screen flex flex-col relative selection:bg-cyan-500 selection:text-white">
+
+  <!-- --- HEADER FLOTTANT --- -->
+  <header class="absolute top-0 left-0 w-full z-30 p-4 flex justify-between items-center pointer-events-none">
+    <div class="pointer-events-auto bg-slate-900/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 shadow-lg">
+      <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse" id="statusDot"></div>
+      <span class="text-xs font-bold tracking-wider uppercase text-slate-200">Caméra</span>
+    </div>
+
+    <div class="pointer-events-auto">
+      <select id="target" class="bg-slate-900/80 backdrop-blur-md border border-white/10 text-white text-sm rounded-full px-4 py-2 outline-none focus:border-cyan-400 font-bold shadow-lg appearance-none text-center">
+        <option value="EUR">Vers EUR (€)</option>
+        <option value="CZK">Vers CZK (Kč)</option>
+        <option value="USD">Vers USD ($)</option>
+        <option value="GBP">Vers GBP (£)</option>
+        <option value="ILS">Vers ILS (₪)</option>
+      </select>
+    </div>
   </header>
 
-  <main>
-    <section class="card">
-      <div id="err"></div>
-      <div id="wrap">
-        <video id="preview" playsinline></video>
-        <canvas id="frame" hidden></canvas>
-
-        <div id="roiResult"></div>
-
-        <!-- DOCK FIXE (ne bouge plus avec la ROI) -->
-        <div class="dock" id="dock">
-          <button id="zoomOut" class="iconBtn" title="Zoom -" aria-label="Zoom -">➖</button>
-          <div id="zoomChip" class="chip" aria-live="polite">1.5×</div>
-          <button id="zoomIn" class="iconBtn" title="Zoom +" aria-label="Zoom +">➕</button>
-          <button id="presetFine" class="iconBtn" title="Ligne fine" aria-label="Ligne fine">≡</button>
-          <button id="swapCur" class="iconBtn" title="Basculer EUR⇄CZK" aria-label="Basculer EUR⇄CZK">↔️</button>
-          <button id="toggleFS" class="iconBtn" title="Plein écran" aria-label="Plein écran">⛶</button>
-        </div>
-
-        <button id="scanFloat" class="fab" title="Scanner" aria-label="Scanner">🔍</button>
-
-        <!-- Overlay masque avec trou -->
-        <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <defs>
-            <mask id="cutout">
-              <rect x="0" y="0" width="100" height="100" fill="white"/>
-              <rect id="holeMask" x="14" y="45" width="72" height="10" fill="black" rx="3" ry="3"/>
-            </mask>
-          </defs>
-          <rect x="0" y="0" width="100" height="100" class="veil" mask="url(#cutout)"/>
-          <rect id="holeStroke" x="14" y="45" width="72" height="10" class="hole-stroke" rx="3" ry="3"/>
-        </svg>
-
-        <button id="roiHandle" aria-label="Déplacer la fenêtre"></button>
+  <!-- --- ZONE CAMÉRA (Main) --- -->
+  <main class="flex-1 relative bg-black w-full h-full overflow-hidden">
+    
+    <!-- Message d'accueil / Erreur -->
+    <div id="startOverlay" class="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/90 p-6 text-center transition-opacity duration-300">
+      <div class="bg-slate-800 p-4 rounded-2xl mb-4 shadow-2xl border border-slate-700">
+        <svg class="w-12 h-12 text-cyan-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        <h1 class="text-xl font-bold text-white">Scanner de Prix</h1>
+        <p class="text-slate-400 text-sm mt-2">Convertissez des devises en temps réel via votre caméra.</p>
       </div>
-    </section>
+      <button id="startBtn" class="bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-bold py-3 px-8 rounded-full shadow-lg shadow-cyan-500/30 transition-all active:scale-95 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        Activer la Caméra
+      </button>
+      <div id="err" class="hidden mt-4 bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-2 rounded-lg text-sm max-w-xs"></div>
+    </div>
 
-    <section class="card">
-      <div class="controls">
-        <div class="ctrl" title="Largeur fenêtre">
-          <span>↔️</span>
-          <input type="range" id="roiW" min="30" max="95" value="72"/>
-        </div>
-        <div class="ctrl" title="Hauteur fenêtre">
-          <span>↕️</span>
-          <input type="range" id="roiH" min="4" max="18" value="10"/>
-        </div>
-        <div class="ctrl" title="Devise cible">
-          <span>💱</span>
-          <select id="target">
-            <option value="EUR" selected>EUR (€)</option>
-            <option value="CZK">CZK (Kč)</option>
-            <option value="USD">USD ($)</option>
-            <option value="GBP">GBP (£)</option>
-            <option value="ILS">ILS (₪)</option>
-          </select>
-        </div>
+    <!-- Wrapper Video -->
+    <div id="wrap" class="relative w-full h-full flex items-center justify-center">
+      <video id="preview" playsinline class="absolute inset-0 w-full h-full object-cover"></video>
+      <canvas id="frame" hidden></canvas> <!-- Canvas caché pour capture -->
+
+      <!-- SVG Overlay (Masque avec trou) -->
+      <svg id="overlay" class="absolute inset-0 w-full h-full z-10 pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs>
+          <mask id="cutout">
+            <rect x="0" y="0" width="100" height="100" fill="white"/>
+            <rect id="holeMask" x="14" y="45" width="72" height="10" fill="black" rx="2" ry="2"/>
+          </mask>
+        </defs>
+        <!-- Le voile sombre -->
+        <rect x="0" y="0" width="100" height="100" fill="rgba(0,0,0,0.6)" mask="url(#cutout)"/>
+        
+        <!-- Le contour du trou -->
+        <rect id="holeStroke" x="14" y="45" width="72" height="10" fill="none" stroke="#22d3ee" stroke-width="0.5" rx="2" ry="2" style="filter: drop-shadow(0 0 4px rgba(34,211,238,0.6));"/>
+      </svg>
+
+      <!-- ROI Handle (Invisible mais draggable) -->
+      <div id="roiHandle" class="absolute z-20 cursor-grab active:cursor-grabbing" aria-label="Déplacer la zone">
+         <!-- Petit indicateur visuel au centre du trou -->
+         <div class="w-full h-full relative group">
+            <div class="scan-beam"></div> <!-- Ligne laser -->
+            <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap">Glisser pour déplacer</div>
+         </div>
       </div>
-    </section>
 
-    <section class="card">
-      <div id="output" class="muted">Aucune donnée scannée pour l’instant.</div>
-      <div id="details" class="muted" style="font-size:.95rem"></div>
-    </section>
+      <!-- Résultat Flottant (Toast) -->
+      <div id="roiResult" class="absolute z-30 top-[20%] left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-xl border border-cyan-500/30 text-white px-5 py-3 rounded-2xl shadow-2xl opacity-0 scale-90 transition-all duration-300 pointer-events-none flex flex-col items-center min-w-[200px]">
+        <div id="resMain" class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400">--</div>
+        <div id="resSub" class="text-xs text-slate-400 font-mono mt-1">En attente...</div>
+      </div>
+
+    </div>
   </main>
+
+  <!-- --- INTERFACE BASSE --- -->
+  <footer class="absolute bottom-0 left-0 w-full z-40 pb-6 pt-12 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent">
+    
+    <!-- Bouton Principal SCAN -->
+    <div class="absolute -top-4 left-1/2 -translate-x-1/2">
+      <button id="scanFloat" class="group relative w-20 h-20 rounded-full bg-white border-4 border-slate-800 shadow-[0_0_30px_rgba(34,211,238,0.4)] flex items-center justify-center transition-transform active:scale-90 disabled:opacity-50 disabled:scale-100">
+        <div class="absolute inset-0 rounded-full border-2 border-cyan-400 opacity-30 animate-ping"></div>
+        <div class="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center z-10 group-hover:bg-slate-800 transition-colors">
+          <svg id="scanIcon" class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          
+          <!-- Spinner (caché par défaut) -->
+          <svg id="loadingIcon" class="hidden w-8 h-8 text-cyan-400 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+      </button>
+    </div>
+
+    <!-- Contrôles -->
+    <div class="px-6 flex justify-between items-end h-16">
+      
+      <!-- Bouton Settings -->
+      <div class="relative">
+        <button id="toggleSettings" class="w-12 h-12 rounded-full bg-slate-800/80 text-slate-300 flex items-center justify-center backdrop-blur border border-slate-700 active:bg-slate-700 transition shadow-lg">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+        </button>
+        
+        <!-- Menu Settings Popover -->
+        <div id="settingsPanel" class="absolute bottom-16 left-0 w-64 bg-slate-800/95 backdrop-blur-xl border border-slate-700 p-4 rounded-2xl shadow-2xl transition-all duration-200 opacity-0 translate-y-4 pointer-events-none z-50 origin-bottom-left">
+            <h3 class="text-xs font-bold text-slate-400 uppercase mb-3">Taille de la fenêtre</h3>
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between text-xs mb-1 text-slate-300"><span>Largeur</span><span id="valW">72%</span></div>
+                    <input type="range" id="roiW" min="30" max="95" value="72">
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs mb-1 text-slate-300"><span>Hauteur</span><span id="valH">10%</span></div>
+                    <input type="range" id="roiH" min="4" max="18" value="10">
+                </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-700 grid grid-cols-2 gap-2">
+                <button id="presetFine" class="bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-xs font-medium">Mode Ligne</button>
+                <button id="presetBig" class="bg-slate-700 hover:bg-slate-600 py-2 rounded-lg text-xs font-medium">Mode Large</button>
+            </div>
+        </div>
+      </div>
+
+      <!-- Bouton Zoom -->
+      <div class="flex items-center gap-3 bg-slate-800/80 backdrop-blur border border-slate-700 rounded-full p-1 pr-4 shadow-lg">
+        <button id="zoomOut" class="w-10 h-10 rounded-full hover:bg-slate-700 flex items-center justify-center text-slate-300 active:scale-90 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+        </button>
+        <span id="zoomChip" class="text-sm font-mono font-bold text-cyan-400 min-w-[3ch] text-center">1.5</span>
+        <button id="zoomIn" class="w-10 h-10 rounded-full hover:bg-slate-700 flex items-center justify-center text-slate-300 active:scale-90 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+        </button>
+      </div>
+
+    </div>
+  </footer>
 
 <script>
 (function(){
   const $ = id => document.getElementById(id);
-  const video=$('preview'), canvas=$('frame'), out=$('output'), details=$('details');
-  const startBtn=$('startBtn'), scanFloat=$('scanFloat');
-  const targetSel=$('target'), roiW=$('roiW'), roiH=$('roiH');
+  const video=$('preview'), canvas=$('frame');
+  const startBtn=$('startBtn'), startOverlay=$('startOverlay'), statusDot=$('statusDot');
+  const scanFloat=$('scanFloat'), scanIcon=$('scanIcon'), loadingIcon=$('loadingIcon');
+  const targetSel=$('target');
+  
+  // Settings
+  const settingsPanel=$('settingsPanel'), toggleSettings=$('toggleSettings');
+  const roiW=$('roiW'), roiH=$('roiH'), valW=$('valW'), valH=$('valH');
+  const presetFine=$('presetFine'), presetBig=$('presetBig');
+  
+  // Overlay & ROI
   const holeMask=$('holeMask'), holeStroke=$('holeStroke');
-  const wrap=$('wrap'), roiResult=$('roiResult');
+  const wrap=$('wrap'), roiHandle=$('roiHandle');
+  const roiResult=$('roiResult'), resMain=$('resMain'), resSub=$('resSub');
+  
+  // Zoom
   const zoomIn=$('zoomIn'), zoomOut=$('zoomOut'), zoomChip=$('zoomChip');
-  const presetFine=$('presetFine'), swapCur=$('swapCur'), toggleFS=$('toggleFS');
-  const roiHandle=$('roiHandle'), errBox=$('err'), dock=$('dock');
 
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-  let hideTimer=null; let stream=null; let zoomFactor=1.5; // défaut
+  let hideTimer=null; 
+  let zoomFactor=1.5;
   let roi={ x:14, y:45, w:72, h:10 };
+  let settingsOpen = false;
 
-  function showErr(msg){ errBox.textContent=msg; errBox.classList.add('show'); setTimeout(()=>errBox.classList.remove('show'),4000); }
-
-  function applyRoi(){
-    roi.w = clamp(roi.w,10,95); roi.h = clamp(roi.h,4,22);
-    roi.x = clamp(roi.x,0.5,99.5 - roi.w); roi.y = clamp(roi.y,0.5,99.5 - roi.h);
-    for(const el of [holeMask,holeStroke]){ el.setAttribute('x',roi.x); el.setAttribute('y',roi.y); el.setAttribute('width',roi.w); el.setAttribute('height',roi.h); }
-    positionWidgets();
+  function showErr(msg){ 
+      const el = $('err'); el.textContent=msg; el.classList.remove('hidden'); 
+      setTimeout(()=>el.classList.add('hidden'), 4000);
   }
 
-  function positionWidgets(){
-    const r = wrap.getBoundingClientRect();
-    // Pastille alignée sous le trou (ou dedans si dépassement) — comme avant
-    const rrLeft = r.width * (roi.x) / 100;
-    let rrTop = r.height * (roi.y + roi.h + 1.5) / 100;
-    const rrWidth = r.width * (roi.w) / 100;
-    if(rrTop + 40 > r.height) rrTop = r.height * (roi.y + roi.h - 1.5) / 100 - 30;
-    Object.assign(roiResult.style, {
-      left: Math.round(rrLeft) + 'px',
-      top:  Math.round(rrTop)  + 'px',
-      width: Math.max(140, Math.round(rrWidth)) + 'px'
-    });
+  // --- UI LOGIC ---
 
-    // Handle de drag sur le trou
-    const hx = r.width * (roi.x) / 100, hy = r.height * (roi.y) / 100;
-    const hw = r.width * (roi.w) / 100, hh = r.height * (roi.h) / 100;
+  // Toggle Settings Menu
+  toggleSettings.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsOpen = !settingsOpen;
+      if(settingsOpen) {
+          settingsPanel.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+          toggleSettings.classList.add('bg-slate-700', 'text-cyan-400');
+      } else {
+          settingsPanel.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+          toggleSettings.classList.remove('bg-slate-700', 'text-cyan-400');
+      }
+  });
+  document.addEventListener('click', (e) => {
+      if(settingsOpen && !settingsPanel.contains(e.target) && e.target !== toggleSettings) {
+          settingsOpen = false;
+          settingsPanel.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+          toggleSettings.classList.remove('bg-slate-700', 'text-cyan-400');
+      }
+  });
+
+  // --- ROI LOGIC ---
+
+  function applyRoi(){
+    roi.w = clamp(roi.w,10,95); roi.h = clamp(roi.h,4,30);
+    roi.x = clamp(roi.x,0.5,99.5 - roi.w); roi.y = clamp(roi.y,0.5,99.5 - roi.h);
+    
+    // Update SVG
+    for(const el of [holeMask,holeStroke]){ 
+        el.setAttribute('x',roi.x); el.setAttribute('y',roi.y); 
+        el.setAttribute('width',roi.w); el.setAttribute('height',roi.h); 
+    }
+    
+    // Update Slider Values display
+    valW.textContent = Math.round(roi.w) + '%';
+    valH.textContent = Math.round(roi.h) + '%';
+    
+    positionHandle();
+  }
+
+  function positionHandle(){
+    const r = wrap.getBoundingClientRect();
+    if(!r.width) return;
+    
+    const hx = r.width * (roi.x) / 100;
+    const hy = r.height * (roi.y) / 100;
+    const hw = r.width * (roi.w) / 100;
+    const hh = r.height * (roi.h) / 100;
+    
     Object.assign(roiHandle.style, { left: hx+'px', top: hy+'px', width: hw+'px', height: hh+'px' });
   }
 
   function syncInputs(){ roiW.value=roi.w; roiH.value=roi.h; }
-  function updateFromInputs(){ roi.w=parseInt(roiW.value,10); roi.h=parseInt(roiH.value,10); roi.x=(100-roi.w)/2; roi.y=(100-roi.h)/2; applyRoi(); }
+  function updateFromInputs(){ 
+      roi.w=parseInt(roiW.value,10); 
+      roi.h=parseInt(roiH.value,10); 
+      roi.x=(100-roi.w)/2; 
+      roi.y=(100-roi.h)/2; 
+      applyRoi(); 
+  }
+  
   roiW.addEventListener('input', updateFromInputs);
   roiH.addEventListener('input', updateFromInputs);
-  window.addEventListener('resize', positionWidgets);
+  window.addEventListener('resize', positionHandle);
 
-  presetFine.addEventListener('click', ()=>{ roi.w=80; roi.h=6; roi.x=(100-roi.w)/2; roi.y=(100-roi.h)/2; syncInputs(); applyRoi(); });
-  swapCur.addEventListener('click', ()=>{ const v=targetSel.value; // bascule rapides EUR<->CZK (si autre, met EUR)
-    targetSel.value = (v==='EUR')?'CZK':(v==='CZK'?'EUR':'EUR'); });
+  presetFine.addEventListener('click', ()=>{ roi.w=80; roi.h=6; syncInputs(); updateFromInputs(); });
+  presetBig.addEventListener('click', ()=>{ roi.w=60; roi.h=20; syncInputs(); updateFromInputs(); });
 
-  function setZoom(z){ zoomFactor = clamp(parseFloat(z.toFixed(2)),1.0,3.0); zoomChip.textContent = zoomFactor+'×'; }
+  // --- ZOOM LOGIC ---
+  function setZoom(z){ 
+      zoomFactor = clamp(parseFloat(z.toFixed(2)),1.0,3.0); 
+      zoomChip.textContent = zoomFactor+'x'; 
+  }
   zoomIn.addEventListener('click', ()=> setZoom(zoomFactor+0.25));
   zoomOut.addEventListener('click', ()=> setZoom(zoomFactor-0.25));
-  setZoom(zoomFactor);
 
-  // Drag via handle (ne chevauche pas la dock)
+  // --- DRAG LOGIC (Touch & Mouse) ---
   let dragging=false, start={x:0,y:0}, roiStart={x:0,y:0};
-  function pt(e){ const t=e.touches?e.touches[0]:e; const rect=wrap.getBoundingClientRect(); return {px:clamp((t.clientX-rect.left)/rect.width*100,0,100), py:clamp((t.clientY-rect.top)/rect.height*100,0,100)}; }
-  function onDown(e){ dragging=true; const {px,py}=pt(e); start={x:px,y:py}; roiStart={x:roi.x,y:roi.y}; e.preventDefault(); }
-  function onMove(e){ if(!dragging) return; const {px,py}=pt(e); roi.x = roiStart.x + (px-start.x); roi.y = roiStart.y + (py-start.y); applyRoi(); e.preventDefault(); }
-  function onUp(){ dragging=false; }
-  roiHandle.addEventListener('mousedown', onDown); roiHandle.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
-  roiHandle.addEventListener('touchstart', onDown, {passive:false}); roiHandle.addEventListener('touchmove', onMove, {passive:false}); roiHandle.addEventListener('touchend', onUp);
+  
+  function pt(e){ 
+      const t=e.touches?e.touches[0]:e; 
+      const rect=wrap.getBoundingClientRect(); 
+      return {
+          px:clamp((t.clientX-rect.left)/rect.width*100,0,100), 
+          py:clamp((t.clientY-rect.top)/rect.height*100,0,100)
+      }; 
+  }
+  
+  function onDown(e){ 
+      dragging=true; 
+      const {px,py}=pt(e); 
+      start={x:px,y:py}; 
+      roiStart={x:roi.x,y:roi.y}; 
+      roiHandle.classList.add('cursor-grabbing');
+      // e.preventDefault(); // Removed to allow click events if needed, verify on mobile
+  }
+  
+  function onMove(e){ 
+      if(!dragging) return; 
+      const {px,py}=pt(e); 
+      roi.x = roiStart.x + (px-start.x); 
+      roi.y = roiStart.y + (py-start.y); 
+      applyRoi(); 
+      e.preventDefault(); 
+  }
+  
+  function onUp(){ 
+      dragging=false; 
+      roiHandle.classList.remove('cursor-grabbing');
+  }
+  
+  roiHandle.addEventListener('mousedown', onDown); 
+  roiHandle.addEventListener('mousemove', onMove); 
+  document.addEventListener('mouseup', onUp);
+  roiHandle.addEventListener('touchstart', onDown, {passive:false}); 
+  roiHandle.addEventListener('touchmove', onMove, {passive:false}); 
+  roiHandle.addEventListener('touchend', onUp);
 
+  // --- SCANNING & OCR LOGIC ---
+  
   const CURRENCY_HINTS=[
     {code:'EUR',match:/(€|\beur\b|\beuro\b)/i},
     {code:'CZK',match:/(\bczk\b|kč|\bkc\b|koruna|couronne)/i},
@@ -203,79 +350,166 @@
 
   function extractAmountAndCurrency(text){
     const line=text.replace(/\n+/g,' ').trim();
+    // Regex légèrement améliorée
     const numberRegex=/([0-9]{1,3}(?:[\s.,][0-9]{3})*|[0-9]+)(?:[\s.,][0-9]{1,2})?/g;
-    const candidates=[]; let m; while((m=numberRegex.exec(line))!==null) candidates.push({raw:m[0]});
-    if(!candidates.length) return null; let cur='CZK';
+    const candidates=[]; let m; 
+    while((m=numberRegex.exec(line))!==null) candidates.push({raw:m[0]});
+    
+    if(!candidates.length) return null; 
+    
+    let cur='CZK'; // default logic from original
     for(const h of CURRENCY_HINTS){ if(h.match.test(line)){ cur=h.code; break; } }
+    
+    // Sort by length (heuristic assumption: longer number usually amount in price tags)
     candidates.sort((a,b)=>b.raw.length-a.raw.length);
     const pick=candidates[0];
-    const amount=parseFloat(pick.raw.replace(/\s/g,'').replace(',', '.'));
-    if(isNaN(amount)) return null; return {amount,srcCur:cur,raw:line};
+    
+    // Cleanup number
+    let cleanNum = pick.raw.replace(/\s/g,'');
+    // Replace comma with dot if it's the decimal separator
+    if(cleanNum.includes(',') && !cleanNum.includes('.')) cleanNum = cleanNum.replace(',','.');
+    else if(cleanNum.includes(',') && cleanNum.includes('.')) cleanNum = cleanNum.replace(',',''); // assume comma is thousand sep
+    
+    const amount=parseFloat(cleanNum);
+    if(isNaN(amount)) return null; 
+    return {amount,srcCur:cur,raw:line};
   }
 
   async function getRate(src,tgt){
     if(src===tgt) return 1;
-    const url=`https://api.frankfurter.app/latest?amount=1&from=${encodeURIComponent(src)}&to=${encodeURIComponent(tgt)}`;
-    const res=await fetch(url);
-    if(!res.ok) throw new Error('Taux introuvable');
-    const data=await res.json();
-    return data.rates[tgt];
+    try {
+        const url=`https://api.frankfurter.app/latest?amount=1&from=${encodeURIComponent(src)}&to=${encodeURIComponent(tgt)}`;
+        const res=await fetch(url);
+        if(!res.ok) throw new Error('API Error');
+        const data=await res.json();
+        return data.rates[tgt];
+    } catch(e) {
+        console.error(e);
+        // Fallback rates (approximatif au cas où l'API plante)
+        const fallback = { 'EUR': 1, 'CZK': 25, 'USD': 1.1, 'ILS': 4, 'GBP': 0.85 };
+        if(fallback[src] && fallback[tgt]) return fallback[tgt] / fallback[src];
+        return 1;
+    }
   }
 
-  function badgeCss(cur){
-    switch(cur){
-      case 'CZK': return 'linear-gradient(90deg, rgba(6,182,212,.92), rgba(8,145,178,.92))';
-      case 'EUR': return 'linear-gradient(90deg, rgba(22,163,74,.92), rgba(21,128,61,.92))';
-      case 'USD': return 'linear-gradient(90deg, rgba(245,158,11,.92), rgba(217,119,6,.92))';
-      case 'GBP': return 'linear-gradient(90deg, rgba(139,92,246,.92), rgba(124,58,237,.92))';
-      case 'ILS': return 'linear-gradient(90deg, rgba(59,130,246,.92), rgba(37,99,235,.92))';
-      default: return 'rgba(17,24,39,.88)';
-    }
+  function setLoading(bool) {
+      scanFloat.disabled = bool;
+      if(bool) {
+          scanIcon.classList.add('hidden');
+          loadingIcon.classList.remove('hidden');
+          roiHandle.classList.add('scanning'); // triggers CSS animation
+      } else {
+          scanIcon.classList.remove('hidden');
+          loadingIcon.classList.add('hidden');
+          roiHandle.classList.remove('scanning');
+      }
+  }
+
+  function showResult(title, sub, success=true) {
+      resMain.innerHTML = title;
+      resSub.textContent = sub;
+      
+      // Colors
+      if(success) {
+          resMain.className = "text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400";
+      } else {
+          resMain.className = "text-xl font-bold text-red-400";
+      }
+
+      roiResult.classList.remove('opacity-0', 'scale-90');
+      if(hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+          roiResult.classList.add('opacity-0', 'scale-90');
+      }, 5000);
   }
 
   async function doScan(){
     try{
-      details.textContent='Lecture…'; scanFloat.disabled=true; roiResult.classList.remove('show'); if(hideTimer){ clearTimeout(hideTimer); hideTimer=null; }
+      setLoading(true);
+      
       const vw=video.videoWidth, vh=video.videoHeight;
-      if(!vw||!vh){ details.textContent='Caméra non prête'; scanFloat.disabled=false; return; }
-      canvas.width=vw; canvas.height=vh; const ctx=canvas.getContext('2d'); ctx.drawImage(video,0,0,vw,vh);
-      const rx=Math.round(vw*roi.x/100), ry=Math.round(vh*roi.y/100), rw=Math.round(vw*roi.w/100), rh=Math.round(vh*roi.h/100);
-      const crop=document.createElement('canvas'); const cctx=crop.getContext('2d');
+      if(!vw||!vh){ showResult("Erreur", "Caméra non prête", false); return; }
+      
+      // Capture Frame
+      canvas.width=vw; canvas.height=vh; 
+      const ctx=canvas.getContext('2d'); 
+      ctx.drawImage(video,0,0,vw,vh);
+      
+      // Crop Logic
+      const rx=Math.round(vw*roi.x/100), ry=Math.round(vh*roi.y/100);
+      const rw=Math.round(vw*roi.w/100), rh=Math.round(vh*roi.h/100);
+      
+      const crop=document.createElement('canvas'); 
+      const cctx=crop.getContext('2d');
+      // Zoom logic applied to crop resolution
       const outW = Math.round(rw*zoomFactor), outH = Math.round(rh*zoomFactor);
-      crop.width=outW; crop.height=outH; cctx.imageSmoothingEnabled=true; cctx.drawImage(canvas,rx,ry,rw,rh,0,0,outW,outH);
+      crop.width=outW; crop.height=outH; 
+      cctx.imageSmoothingEnabled=true; 
+      cctx.imageSmoothingQuality='high';
+      cctx.drawImage(canvas,rx,ry,rw,rh,0,0,outW,outH);
 
-      const {data:{text}}=await Tesseract.recognize(crop,'eng+fra',{ tessedit_pageseg_mode:7 });
-      const parsed=extractAmountAndCurrency(text); if(!parsed){ out.textContent='Rien d\'exploitable'; details.textContent=''; return; }
-      const tgt=targetSel.value; const rate=await getRate(parsed.srcCur,tgt); const converted=parsed.amount*rate;
+      // OCR
+      const {data:{text}}=await Tesseract.recognize(crop,'eng+fra',{ 
+          tessedit_char_whitelist: '0123456789.,€$£₪kčKC ', // Optimisation
+          tessedit_pageseg_mode:7 // Single line mode
+      });
+      
+      const parsed=extractAmountAndCurrency(text); 
+      
+      if(!parsed){ 
+          showResult("Non détecté", "Essayez de stabiliser ou zoomer", false); 
+          return; 
+      }
+      
+      const tgt=targetSel.value; 
+      const rate=await getRate(parsed.srcCur,tgt); 
+      const converted=parsed.amount*rate;
 
-      roiResult.textContent=`${parsed.amount.toFixed(2)} ${parsed.srcCur} ≈ ${converted.toFixed(2)} ${tgt}`;
-      roiResult.style.background = badgeCss(parsed.srcCur);
-      positionWidgets(); roiResult.classList.add('show'); setTimeout(()=>roiResult.classList.remove('show'),5000);
+      // Success Display
+      showResult(
+          `${converted.toFixed(2)} <small>${tgt}</small>`, 
+          `Source: ${parsed.amount.toFixed(2)} ${parsed.srcCur}`
+      );
 
-      out.innerHTML=`🧮 <strong>${parsed.amount.toFixed(2)} ${parsed.srcCur}</strong> ≈ <strong>${converted.toFixed(2)} ${tgt}</strong>`;
-      details.innerHTML=`Taux: 1 ${parsed.srcCur} = ${rate.toFixed(4)} ${tgt}<br><span class="muted">OCR: ${parsed.raw.substring(0,160).replace(/</g,'&lt;')}…</span>`;
-    }catch(err){ showErr(err.message||String(err)); }
-    finally{ scanFloat.disabled=false; }
+    }catch(err){ 
+        showErr(err.message||String(err)); 
+        showResult("Erreur", "Problème technique", false);
+    }
+    finally{ 
+        setLoading(false); 
+    }
   }
 
+  // --- INIT CAM ---
   startBtn.addEventListener('click', async ()=>{
     try{
-      const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
-      video.srcObject = stream; await video.play();
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+          video:{ 
+              facingMode: 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+          } 
+      });
+      video.srcObject = stream; 
+      await video.play();
+      
+      // Switch UI
+      startOverlay.classList.add('opacity-0', 'pointer-events-none');
+      setTimeout(()=>startOverlay.style.display='none', 500);
+      statusDot.classList.remove('bg-red-500');
+      statusDot.classList.add('bg-green-500');
+      
       scanFloat.addEventListener('click', doScan);
       applyRoi();
-    }catch(e){ showErr("Impossible d’accéder à la caméra. Vérifie les permissions et HTTPS."); }
+    }catch(e){ 
+        showErr("Accès caméra refusé ou HTTPS manquant."); 
+    }
   });
 
-  toggleFS.addEventListener('click', async ()=>{
-    document.body.classList.add('fullscreen');
-    if(document.documentElement.requestFullscreen){ try{ await document.documentElement.requestFullscreen(); }catch{} }
-    positionWidgets();
-  });
-  document.addEventListener('fullscreenchange', ()=>{ if(!document.fullscreenElement){ document.body.classList.remove('fullscreen'); positionWidgets(); } });
-
-  // init
+  // Init
   applyRoi();
+  syncInputs();
+
 })();
 </script>
 </body>
