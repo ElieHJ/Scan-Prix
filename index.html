@@ -2,7 +2,8 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <!-- Ajout de viewport-fit=cover pour gérer les encoches/notch -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Price Scanner Pro</title>
   <meta name="theme-color" content="#0f172a"/>
   
@@ -50,10 +51,11 @@
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body class="h-screen w-screen flex flex-col relative selection:bg-cyan-500 selection:text-white">
+<!-- Utilisation de h-[100dvh] pour la hauteur dynamique mobile -->
+<body class="h-[100dvh] w-screen flex flex-col relative selection:bg-cyan-500 selection:text-white">
 
   <!-- --- HEADER FLOTTANT --- -->
-  <header class="absolute top-0 left-0 w-full z-30 p-4 flex justify-between items-center pointer-events-none">
+  <header class="absolute top-0 left-0 w-full z-30 p-4 pt-8 flex justify-between items-center pointer-events-none">
     <div class="pointer-events-auto bg-slate-900/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 shadow-lg">
       <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse" id="statusDot"></div>
       <span class="text-xs font-bold tracking-wider uppercase text-slate-200">Caméra</span>
@@ -126,7 +128,8 @@
   </main>
 
   <!-- --- INTERFACE BASSE --- -->
-  <footer class="absolute bottom-0 left-0 w-full z-40 pb-6 pt-12 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent">
+  <!-- Modification ici : pb-14 au lieu de pb-6 pour remonter les boutons -->
+  <footer class="absolute bottom-0 left-0 w-full z-40 pb-14 pt-12 bg-gradient-to-t from-slate-900 via-slate-900/90 to-transparent">
     
     <!-- Bouton Principal SCAN -->
     <div class="absolute -top-4 left-1/2 -translate-x-1/2">
